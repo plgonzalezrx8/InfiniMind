@@ -122,3 +122,20 @@ class RecallResponse(BaseModel):
     count: int
     memories: list[RecallItem]
     debug: RecallDebug | None = None
+
+
+class ReembedRequest(BaseModel):
+    """Admin request payload for shadow re-embedding operations."""
+
+    target_model_id: str
+    dry_run: bool = False
+    limit: int = Field(default=10000, ge=1, le=100000)
+
+
+class ReembedResponse(BaseModel):
+    """Admin response payload for re-embedding operations."""
+
+    target_model_id: str
+    processed: int
+    dry_run: bool
+    shadow_table: str | None = None

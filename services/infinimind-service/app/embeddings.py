@@ -63,3 +63,16 @@ def build_embedding_client(settings: Settings) -> EmbeddingClient:
         return OpenAIEmbeddingClient(api_key=settings.openai_api_key, model=settings.embedding_model)
 
     raise ValueError(f"Unsupported embedding provider: {settings.embedding_provider}")
+
+
+def build_embedding_client_for_model(settings: Settings, model: str) -> EmbeddingClient:
+    """Build an embedding client for an explicit model id.\n\n    Used by admin re-embed jobs so we can produce shadow embeddings safely.\n    """
+
+    provider = settings.embedding_provider.lower().strip()
+    if provider == "mock":
+        return MockEmbeddingClient(dim=settings.vector_dim)
+    if provider == "openai":
+        if not settings.openai_api_key:
+            raise ValueError("INFINIMIND_OPENAI_API_KEY is required when provider is openai")
+        return OpenAIEmbeddingClient(api_key=settings.openai_api_key, model=model)
+    raise ValueError(f"Unsupported embedding provider: {settings.embedding_provider}")

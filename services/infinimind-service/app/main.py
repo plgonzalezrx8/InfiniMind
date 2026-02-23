@@ -10,6 +10,8 @@ from fastapi import Depends, FastAPI
 from .api_models import (
     BatchStoreRequest,
     BatchStoreResponse,
+    ReembedRequest,
+    ReembedResponse,
     RecallDebug,
     RecallItem,
     RecallRequest,
@@ -17,8 +19,8 @@ from .api_models import (
     StoreMemoryRequest,
     StoreMemoryResult,
 )
-from .auth import require_api_key
-from .embeddings import build_embedding_client
+from .auth import require_admin_api_key, require_api_key
+from .embeddings import build_embedding_client, build_embedding_client_for_model
 from .memory_schema import MemoryRecord, compute_content_hash
 from .models import HealthResponse
 from .observability import (
@@ -104,6 +106,39 @@ def metrics():
     """Expose Prometheus metrics for scraping."""
 
     return metrics_response()
+
+
+@app.post(
+    "/v1/admin/reembed",
+    response_model=ReembedResponse,
+    dependencies=[Depends(require_admin_api_key)],
+)
+def reembed(payload: ReembedRequest) -> ReembedResponse:
+    """Re-embed existing rows into a new shadow table without overwriting primary vectors."""
+
+    settings = get_settings()
+    rows = app.state.memory_store.list_memories(limit=payload.limit)
+    if payload.dry_run:
+        return ReembedResponse(
+            target_model_id=payload.target_model_id,
+            processed=len(rows),
+            dry_run=True,
+            shadow_table=None,
+        )
+
+    embedder = build_embedding_client_for_model(settings, payload.target_model_id)
+    vectors = [embedder.embed(str(row.get("text") or "")) for row in rows]
+    shadow_table = app.state.memory_store.write_shadow_embeddings(
+        target_model_id=payload.target_model_id,
+        rows=rows,
+        vectors=vectors,
+    )
+    return ReembedResponse(
+        target_model_id=payload.target_model_id,
+        processed=len(rows),
+        dry_run=False,
+        shadow_table=shadow_table,
+    )
 
 
 def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:

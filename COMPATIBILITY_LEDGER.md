@@ -111,3 +111,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add explicit service-side Prometheus metrics and policy counters independent of OpenClaw core internals.
 - Impact:
   - Operators can monitor recall quality/safety and endpoint latency directly in sidecar deployments.
+
+## 2026-02-23 — Feature: `feat(reembed): admin re-embed endpoint with embedding version safety`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/config.ts
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Use shadow-table re-embedding to avoid in-place vector overwrite during model migrations.
+- Impact:
+  - Operators can validate new embedding versions safely before any retrieval cutover.

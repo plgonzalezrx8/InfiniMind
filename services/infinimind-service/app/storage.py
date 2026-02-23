@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -217,3 +219,30 @@ class LanceMemoryStore:
             return to_arrow().to_pylist()
 
         return []
+
+    def write_shadow_embeddings(
+        self,
+        *,
+        target_model_id: str,
+        rows: list[dict[str, Any]],
+        vectors: list[list[float]],
+    ) -> str:
+        """Write shadow embeddings to a separate table for safe migrations."""
+
+        self.ensure_initialized()
+        assert self._db is not None
+
+        safe_model = re.sub(r"[^a-zA-Z0-9]+", "_", target_model_id).strip("_").lower() or "model"
+        suffix = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+        table_name = f"memories_shadow_{safe_model}_{suffix}"
+
+        shadow_rows: list[dict[str, Any]] = []
+        for row, vector in zip(rows, vectors, strict=False):
+            copied = dict(row)
+            copied["source_embedding_model_id"] = row.get("embedding_model_id")
+            copied["embedding_model_id"] = target_model_id
+            copied["vector"] = vector
+            shadow_rows.append(copied)
+
+        self._db.create_table(table_name, data=shadow_rows)
+        return table_name
