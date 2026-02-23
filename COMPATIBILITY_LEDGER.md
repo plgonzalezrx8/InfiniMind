@@ -167,3 +167,11 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add release checklist, tighten operator docs, and harden runtime with graceful LanceDB fallback for unsupported environments.
 - Impact:
   - Branch is merge-ready with documented verification and rollback controls.
+
+## 2026-02-23 — Feature: `chore(deploy): remove obsolete docker compose version field`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+- Decision:
+  - Remove obsolete compose `version` key to avoid noisy deploy-time warnings.
+- Impact:
+  - Cleaner operator output during sidecar startup and validation.
