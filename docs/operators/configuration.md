@@ -5,6 +5,7 @@
 From repository root:
 
 ```bash
+cp .env.example .env
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
@@ -20,6 +21,26 @@ Main variables used by the service container:
 - `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
 - `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
 - `INFINIMIND_OPENAI_API_KEY`: required for OpenAI embeddings
+
+## Key setup (no ambiguity)
+
+`INFINIMIND_API_KEY` is the main bearer token.
+
+You set it in `.env` (or shell env), and the same value must be used by:
+
+1. Service container (`INFINIMIND_API_KEY`)
+2. Curl/manual calls (`Authorization: Bearer <value>`)
+3. OpenClaw bridge config (`plugins.entries.infinimind-bridge.config.apiKey`)
+
+If any of those values differ, requests fail with `401`.
+
+`INFINIMIND_ADMIN_API_KEY` is only for admin endpoint `/v1/admin/reembed`.
+
+Recommended key generation command:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ## OpenClaw configuration file changes
 

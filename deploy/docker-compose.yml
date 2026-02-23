@@ -7,8 +7,9 @@ services:
     container_name: infinimind-service
     environment:
       INFINIMIND_APP_ENV: "docker"
-      INFINIMIND_API_KEY: "change-me-now"
-      INFINIMIND_ADMIN_API_KEY: "change-me-now"
+      # These resolve from shell/.env; defaults are for local smoke testing only.
+      INFINIMIND_API_KEY: "${INFINIMIND_API_KEY:-change-me-now}"
+      INFINIMIND_ADMIN_API_KEY: "${INFINIMIND_ADMIN_API_KEY:-change-me-now}"
       INFINIMIND_DATA_DIR: "/var/lib/infinimind"
       INFINIMIND_EMBEDDING_PROVIDER: "openai"
       INFINIMIND_EMBEDDING_MODEL: "text-embedding-3-large"

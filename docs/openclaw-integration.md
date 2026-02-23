@@ -49,6 +49,14 @@ Update `~/.openclaw/openclaw.json`:
 }
 ```
 
+`apiKey: "${INFINIMIND_API_KEY}"` means OpenClaw resolves the value from its process environment.
+
+Important:
+
+1. Set `INFINIMIND_API_KEY` in the environment where OpenClaw runs.
+2. Set the same value for the InfiniMind service (`INFINIMIND_API_KEY`).
+3. If these differ, bridge calls fail with `401`.
+
 ## Validation and restart behavior
 
 - OpenClaw uses strict validation for plugin ids, slots, and config schema.

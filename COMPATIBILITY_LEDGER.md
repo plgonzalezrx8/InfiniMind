@@ -184,3 +184,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Consolidate all operator/developer run instructions into root README and add explicit MIT licensing.
 - Impact:
   - Repository now has a single comprehensive setup/run reference and clear open-source licensing.
+
+## 2026-02-23 — Feature: `docs(clarity): explicit token setup and usage guidance`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Document exact key ownership and mapping across service env, curl auth headers, and OpenClaw bridge config.
+- Impact:
+  - Operators now have unambiguous setup steps for `INFINIMIND_API_KEY` and `INFINIMIND_ADMIN_API_KEY`.

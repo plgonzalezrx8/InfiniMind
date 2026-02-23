@@ -41,25 +41,43 @@ This repository contains a working MVP implementation on branch `codex/infinimin
 
 ## Quick start (Docker-first)
 
-1. Start service:
+1. Create your local env file:
+
+```bash
+cp .env.example .env
+```
+
+2. Set values in `.env`:
+
+- `INFINIMIND_API_KEY`: token used by callers like `curl` and OpenClaw bridge
+- `INFINIMIND_ADMIN_API_KEY`: token used for admin endpoint `/v1/admin/reembed`
+- `OPENAI_API_KEY`: required when using `INFINIMIND_EMBEDDING_PROVIDER=openai`
+
+You can generate strong tokens with:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+3. Start service:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-2. Verify liveness:
+4. Verify liveness:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/health
 ```
 
-3. Verify readiness (auth required):
+5. Verify readiness (auth required):
 
 ```bash
-curl -s -H "Authorization: Bearer change-me-now" http://127.0.0.1:8080/v1/ready
+curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
 ```
 
-4. Verify metrics endpoint:
+6. Verify metrics endpoint:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/metrics | head
@@ -67,7 +85,7 @@ curl -s http://127.0.0.1:8080/v1/metrics | head
 
 ## Environment variables
 
-Main service settings:
+Main service settings (from shell env or `.env`):
 
 - `INFINIMIND_API_KEY`: bearer token for service calls
 - `INFINIMIND_ADMIN_API_KEY`: admin token for re-embed endpoint
@@ -75,6 +93,24 @@ Main service settings:
 - `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
 - `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
 - `INFINIMIND_OPENAI_API_KEY`: required when provider is `openai`
+
+### Token mapping (important)
+
+The same token value must be used in all of these places:
+
+1. Service runtime: `INFINIMIND_API_KEY`
+2. Manual calls: `Authorization: Bearer <token>`
+3. OpenClaw bridge config: `plugins.entries.infinimind-bridge.config.apiKey`
+
+If these do not match exactly, requests fail with `401`.
+
+`change-me-now` is only a local fallback default from `docker-compose` when no env value is set.
+
+### What value should I use?
+
+- Local dev only: any non-empty value is fine (for example `dev-local-token`).
+- Shared/staging/prod: use a random 32+ character secret.
+- Recommended: generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
 ## API endpoints
 
@@ -90,7 +126,7 @@ Main service settings:
 
 ```bash
 curl -s \
-  -H "Authorization: Bearer change-me-now" \
+  -H "Authorization: Bearer ${INFINIMIND_API_KEY}" \
   -H "Content-Type: application/json" \
   -X POST http://127.0.0.1:8080/v1/memory/store \
   -d '{
@@ -106,7 +142,7 @@ curl -s \
 
 ```bash
 curl -s \
-  -H "Authorization: Bearer change-me-now" \
+  -H "Authorization: Bearer ${INFINIMIND_API_KEY}" \
   -H "Content-Type: application/json" \
   -X POST http://127.0.0.1:8080/v1/memory/recall \
   -d '{
@@ -194,7 +230,7 @@ python3 -m pytest tests/openclaw -q
 Use the recall benchmark harness:
 
 ```bash
-python3 scripts/benchmark_recall.py --base-url http://127.0.0.1:8080 --api-key change-me-now --loops 100
+python3 scripts/benchmark_recall.py --base-url http://127.0.0.1:8080 --api-key "${INFINIMIND_API_KEY}" --loops 100
 ```
 
 This reports latency (`mean/p50/p95`) and a top-1 hit-rate proxy for `rerank=off` vs `rerank=hybrid`.
