@@ -1,0 +1,55 @@
+{
+  "id": "infinimind-bridge",
+  "kind": "memory",
+  "uiHints": {
+    "baseUrl": {
+      "label": "InfiniMind Base URL",
+      "placeholder": "http://infinimind:8080",
+      "help": "HTTP endpoint for the InfiniMind service"
+    },
+    "apiKey": {
+      "label": "InfiniMind API Key",
+      "sensitive": true,
+      "placeholder": "${INFINIMIND_API_KEY}",
+      "help": "Bearer token used to authenticate bridge requests"
+    },
+    "timeoutMs": {
+      "label": "Request Timeout (ms)",
+      "placeholder": "4000",
+      "advanced": true
+    },
+    "defaultScope": {
+      "label": "Default Scope",
+      "help": "Default recall scope when not provided in tool params"
+    },
+    "includeSensitiveDefault": {
+      "label": "Include Sensitive by Default",
+      "help": "If enabled, bridge requests can ask for sensitive memories by default",
+      "advanced": true
+    },
+    "rerankDefault": {
+      "label": "Default Rerank Mode",
+      "help": "Controls whether hybrid reranking is used when not specified",
+      "advanced": true
+    },
+    "fallbackMode": {
+      "label": "Fallback Mode",
+      "help": "Controls recall expansion behavior when strict filters return too few candidates",
+      "advanced": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": { "type": "string" },
+      "apiKey": { "type": "string" },
+      "timeoutMs": { "type": "number", "minimum": 100, "maximum": 120000 },
+      "defaultScope": { "type": "string", "enum": ["global", "user", "channel", "session"] },
+      "includeSensitiveDefault": { "type": "boolean" },
+      "rerankDefault": { "type": "string", "enum": ["off", "hybrid"] },
+      "fallbackMode": { "type": "string", "enum": ["off", "legacy-compatible"] }
+    },
+    "required": ["baseUrl", "apiKey"]
+  }
+}

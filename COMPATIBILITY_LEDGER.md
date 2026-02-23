@@ -83,3 +83,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Enforce high-sensitivity recall only for high-trust callers and apply safe fallback that never bypasses hard boundaries.
 - Impact:
   - Retrieval can expand candidate coverage without introducing cross-context or sensitivity leakage.
+
+## 2026-02-23 — Feature: `feat(bridge): OpenClaw plugin manifest/schema and HTTP client bridge`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/openclaw.plugin.json
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/config.ts
+- Decision:
+  - Implement strict bridge manifest/config schema with env-var interpolation and bounded timeouts.
+- Impact:
+  - OpenClaw can validate bridge config at startup without executing plugin code.
