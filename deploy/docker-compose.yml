@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  infinimind:
+    build:
+      context: ../services/infinimind-service
+      dockerfile: Dockerfile
+    image: infinimind-service:local
+    container_name: infinimind-service
+    environment:
+      INFINIMIND_APP_ENV: "docker"
+      INFINIMIND_API_KEY: "change-me-now"
+      INFINIMIND_ADMIN_API_KEY: "change-me-now"
+      INFINIMIND_DATA_DIR: "/var/lib/infinimind"
+      INFINIMIND_EMBEDDING_PROVIDER: "openai"
+      INFINIMIND_EMBEDDING_MODEL: "text-embedding-3-large"
+      INFINIMIND_OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - infinimind_data:/var/lib/infinimind
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  infinimind_data:
+    name: infinimind_data

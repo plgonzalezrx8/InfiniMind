@@ -19,3 +19,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep auth simple and token-based to match plugin-to-service call patterns while preserving external integration boundaries.
 - Impact:
   - Service can be health-checked and protected before retrieval/storage logic lands.
+
+## 2026-02-23 — Feature: `feat(docker): production Dockerfile, compose stack, persistent volume wiring`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/cli/plugins.md
+- Decision:
+  - Preserve a sidecar deployment model and keep explicit restart expectations for OpenClaw plugin config changes.
+- Impact:
+  - Docker-first runtime aligns with operations while keeping OpenClaw plugin behavior predictable.
