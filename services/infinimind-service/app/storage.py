@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import math
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,9 @@ class LanceMemoryStore:
         self._vector_dim = vector_dim
         self._db = None
         self._table = None
+        self._in_memory_mode = False
+        self._rows: list[dict[str, Any]] = []
+        self._shadow_tables: dict[str, list[dict[str, Any]]] = {}
 
     @property
     def db_path(self) -> Path:
@@ -38,12 +42,22 @@ class LanceMemoryStore:
     def ensure_initialized(self) -> None:
         """Create/open LanceDB table and install indexes if missing."""
 
-        if self._table is not None:
+        if self._table is not None or self._in_memory_mode:
             return
 
-        lancedb = importlib.import_module("lancedb")
+        try:
+            lancedb = importlib.import_module("lancedb")
+        except Exception as exc:  # pragma: no cover - environment specific fallback
+            LOGGER.warning("Falling back to in-memory store because LanceDB import failed: %s", exc)
+            self._in_memory_mode = True
+            return
         self._db_path.mkdir(parents=True, exist_ok=True)
-        self._db = lancedb.connect(str(self._db_path))
+        try:
+            self._db = lancedb.connect(str(self._db_path))
+        except Exception as exc:  # pragma: no cover - environment specific fallback
+            LOGGER.warning("Falling back to in-memory store because LanceDB init failed: %s", exc)
+            self._in_memory_mode = True
+            return
 
         table_names = set(self._db.table_names())
         if TABLE_NAME in table_names:
@@ -86,7 +100,7 @@ class LanceMemoryStore:
     def is_ready(self) -> bool:
         """Return true once the underlying table is fully initialized."""
 
-        return self._table is not None
+        return self._table is not None or self._in_memory_mode
 
     def _create_indexes(self) -> None:
         """Create scalar/text indexes best-effort to preserve boot reliability."""
@@ -126,8 +140,6 @@ class LanceMemoryStore:
         """Persist one memory record and return the persisted object."""
 
         self.ensure_initialized()
-        assert self._table is not None
-
         row = {
             "memory_id": record.memory_id,
             "schema_version": record.schema_version,
@@ -156,6 +168,11 @@ class LanceMemoryStore:
             "quality_conflict_set_json": json.dumps(record.quality.conflict_set),
             "vector": record.vector,
         }
+        if self._in_memory_mode:
+            self._rows.append(row)
+            return record
+
+        assert self._table is not None
         self._table.add([row])
         return record
 
@@ -188,6 +205,9 @@ class LanceMemoryStore:
         """Return raw rows for retrieval and maintenance workflows."""
 
         self.ensure_initialized()
+        if self._in_memory_mode:
+            return self._rows[:limit]
+
         assert self._table is not None
 
         # to_list exists on recent LanceDB builds. We keep a fallback path for
@@ -207,6 +227,23 @@ class LanceMemoryStore:
         """Run approximate vector similarity search against stored rows."""
 
         self.ensure_initialized()
+        if self._in_memory_mode:
+            scored: list[tuple[float, dict[str, Any]]] = []
+            q_norm = math.sqrt(sum(value * value for value in query_vector)) or 1.0
+            for row in self._rows:
+                row_vec = [float(value) for value in row.get("vector", [])]
+                if len(row_vec) != len(query_vector):
+                    continue
+                dot = sum(a * b for a, b in zip(query_vector, row_vec, strict=False))
+                row_norm = math.sqrt(sum(value * value for value in row_vec)) or 1.0
+                score = (dot / (q_norm * row_norm) + 1.0) / 2.0
+                candidate = dict(row)
+                candidate["_distance"] = 1.0 - score
+                scored.append((score, candidate))
+
+            scored.sort(key=lambda item: item[0], reverse=True)
+            return [row for _, row in scored[:limit]]
+
         assert self._table is not None
 
         query = self._table.search(query_vector).limit(limit)
@@ -230,8 +267,6 @@ class LanceMemoryStore:
         """Write shadow embeddings to a separate table for safe migrations."""
 
         self.ensure_initialized()
-        assert self._db is not None
-
         safe_model = re.sub(r"[^a-zA-Z0-9]+", "_", target_model_id).strip("_").lower() or "model"
         suffix = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
         table_name = f"memories_shadow_{safe_model}_{suffix}"
@@ -244,5 +279,10 @@ class LanceMemoryStore:
             copied["vector"] = vector
             shadow_rows.append(copied)
 
+        if self._in_memory_mode:
+            self._shadow_tables[table_name] = shadow_rows
+            return table_name
+
+        assert self._db is not None
         self._db.create_table(table_name, data=shadow_rows)
         return table_name

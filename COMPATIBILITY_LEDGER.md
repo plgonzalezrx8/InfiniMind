@@ -158,3 +158,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Document exact config keys and operational sequences for plugin slot cutover and rollback.
 - Impact:
   - Operators can deploy and rollback InfiniMind integration with predictable, validated steps.
+
+## 2026-02-23 — Feature: `chore(release): final hardening and merge checklist`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add release checklist, tighten operator docs, and harden runtime with graceful LanceDB fallback for unsupported environments.
+- Impact:
+  - Branch is merge-ready with documented verification and rollback controls.

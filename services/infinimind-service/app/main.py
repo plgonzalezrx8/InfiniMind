@@ -1,7 +1,8 @@
 """FastAPI application entrypoint for the InfiniMind service."""
 
-import logging
 import json
+import logging
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -38,18 +39,10 @@ from .storage import LanceMemoryStore
 APP_VERSION = "0.1.0"
 LOGGER = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="InfiniMind Service",
-    version=APP_VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-install_metrics_middleware(app)
 
-
-@app.on_event("startup")
-def startup() -> None:
-    """Initialize persistent dependencies required by the service."""
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    """Initialize and tear down shared runtime dependencies."""
 
     settings = get_settings()
     store = LanceMemoryStore(db_path=settings.lancedb_path, vector_dim=settings.vector_dim)
@@ -57,6 +50,17 @@ def startup() -> None:
     app.state.memory_store = store
     app.state.embedding_client = build_embedding_client(settings)
     LOGGER.info("Initialized LanceDB store at %s", store.db_path)
+    yield
+
+
+app = FastAPI(
+    title="InfiniMind Service",
+    version=APP_VERSION,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=_lifespan,
+)
+install_metrics_middleware(app)
 
 
 @app.get("/v1/health", response_model=HealthResponse)
