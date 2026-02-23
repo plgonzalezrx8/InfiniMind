@@ -121,3 +121,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Use shadow-table re-embedding to avoid in-place vector overwrite during model migrations.
 - Impact:
   - Operators can validate new embedding versions safely before any retrieval cutover.
+
+## 2026-02-23 — Feature: `test(service): unit/integration coverage for store/recall/policy`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Mirror legacy memory tool behavior in API assertions while verifying new policy and fallback controls.
+- Impact:
+  - Service regressions around compatibility, safety, and recall packaging are now test-addressable.
