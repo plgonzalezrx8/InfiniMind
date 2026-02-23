@@ -21,6 +21,13 @@ from .auth import require_api_key
 from .embeddings import build_embedding_client
 from .memory_schema import MemoryRecord, compute_content_hash
 from .models import HealthResponse
+from .observability import (
+    POLICY_NOTES_TOTAL,
+    RECALL_FALLBACK_TOTAL,
+    STORE_RESULTS_TOTAL,
+    install_metrics_middleware,
+    metrics_response,
+)
 from .policy import apply_hard_filters, apply_safe_fallback
 from .retrieval import hybrid_rank
 from .settings import get_settings
@@ -35,6 +42,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+install_metrics_middleware(app)
 
 
 @app.on_event("startup")
@@ -91,6 +99,13 @@ def ready(_: None = Depends(require_api_key)) -> HealthResponse:
     )
 
 
+@app.get("/v1/metrics")
+def metrics():
+    """Expose Prometheus metrics for scraping."""
+
+    return metrics_response()
+
+
 def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:
     """Store one memory item with duplicate detection."""
 
@@ -105,6 +120,7 @@ def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:
         dedupe_key=payload.dedupe_key,
     )
     if duplicate:
+        STORE_RESULTS_TOTAL.labels(action="duplicate").inc()
         return StoreMemoryResult(
             action="duplicate",
             memory_id=str(duplicate.get("memory_id")),
@@ -137,6 +153,7 @@ def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:
         vector=vector,
     )
     app.state.memory_store.store_memory(record)
+    STORE_RESULTS_TOTAL.labels(action="created").inc()
     return StoreMemoryResult(action="created", memory_id=record.memory_id)
 
 
@@ -220,6 +237,10 @@ def recall(payload: RecallRequest) -> RecallResponse:
         filtered_rows = apply_safe_fallback(rows, payload)
         fallback_applied = True
         policy_notes.append("safe fallback relaxed optional filters")
+        RECALL_FALLBACK_TOTAL.inc()
+
+    for note in policy_notes:
+        POLICY_NOTES_TOTAL.labels(note=note).inc()
     items: list[RecallItem]
 
     if payload.rerank == "hybrid":

@@ -102,3 +102,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep OpenClaw tool names and legacy params while forwarding additive fields to InfiniMind.
 - Impact:
   - Existing OpenClaw agent behaviors can migrate to external memory service without prompt changes.
+
+## 2026-02-23 — Feature: `feat(observability): metrics, traces, policy counters, latency histograms`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/diagnostics-otel/openclaw.plugin.json
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add explicit service-side Prometheus metrics and policy counters independent of OpenClaw core internals.
+- Impact:
+  - Operators can monitor recall quality/safety and endpoint latency directly in sidecar deployments.
