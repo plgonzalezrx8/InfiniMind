@@ -139,3 +139,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add repository-local contract tests for bridge manifest strictness and slot wiring, plus an executable E2E run script.
 - Impact:
   - OpenClaw integration regressions can be detected before runtime deployment.
+
+## 2026-02-23 — Feature: `test(perf): latency and quality benchmark harness`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Add a standalone benchmark harness comparing rerank modes with p50/p95 and top-1 hit-rate proxies.
+- Impact:
+  - Teams can quantify recall quality and latency tradeoffs during canaries and regressions.
