@@ -165,7 +165,11 @@ def batch_store(payload: BatchStoreRequest) -> BatchStoreResponse:
     )
 
 
-def _row_to_recall_item(row: dict, score: float) -> RecallItem:
+def _row_to_recall_item(
+    row: dict,
+    score: float,
+    score_breakdown: dict[str, float] | None = None,
+) -> RecallItem:
     """Convert a raw storage row into the public recall response shape."""
 
     tags = json.loads(row.get("tags_json") or "[]")
@@ -192,6 +196,7 @@ def _row_to_recall_item(row: dict, score: float) -> RecallItem:
             "conflict_set": conflict_set,
         },
         embedding_model_id=str(row.get("embedding_model_id") or ""),
+        score_breakdown=score_breakdown,
     )
 
 
@@ -211,7 +216,14 @@ def recall(payload: RecallRequest) -> RecallResponse:
             query_vector=query_vector,
             limit=payload.limit,
         )
-        items = [_row_to_recall_item(item["row"], score=float(item["score"])) for item in ranked]
+        items = [
+            _row_to_recall_item(
+                item["row"],
+                score=float(item["score"]),
+                score_breakdown=item.get("score_breakdown"),
+            )
+            for item in ranked
+        ]
     else:
         query_terms = [token for token in payload.query.lower().split() if token]
         scored: list[tuple[float, dict]] = []
@@ -221,11 +233,18 @@ def recall(payload: RecallRequest) -> RecallResponse:
             lexical_score = term_hits / max(len(query_terms), 1)
             importance = float(row.get("importance") or 0.0)
             score = (0.65 * lexical_score) + (0.35 * importance)
-            scored.append((score, row))
+            scored.append((score, row, lexical_score, importance))
 
         scored.sort(key=lambda item: item[0], reverse=True)
         top_rows = scored[: payload.limit]
-        items = [_row_to_recall_item(row, score=score) for score, row in top_rows]
+        items = [
+            _row_to_recall_item(
+                row,
+                score=score,
+                score_breakdown={"lexical": lexical_score, "importance": importance},
+            )
+            for score, row, lexical_score, importance in top_rows
+        ]
 
     debug = None
     if payload.debug:

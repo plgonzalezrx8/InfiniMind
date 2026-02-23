@@ -65,3 +65,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Implement hybrid fusion using BM25-style lexical scoring + vector similarity with explicit weighting.
 - Impact:
   - Recall can now serve both semantic paraphrases and exact-token queries from one API path.
+
+## 2026-02-23 — Feature: `feat(recall-packaging): provenance/confidence + debug score breakdown`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Return structured recall details with explicit scoring diagnostics for auditability.
+- Impact:
+  - OpenClaw bridge can expose explainable memory context without changing core OpenClaw behavior.

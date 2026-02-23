@@ -101,6 +101,7 @@ class RecallItem(BaseModel):
     provenance: dict[str, Any]
     quality: dict[str, Any]
     embedding_model_id: str
+    score_breakdown: dict[str, float] | None = None
 
 
 class RecallDebug(BaseModel):
