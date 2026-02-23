@@ -1,0 +1,19 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Node artifacts
+node_modules/
+dist/
+coverage/
+
+# Runtime state
+.env
+*.log
+*.sqlite
+*.db
+
+# OS files
+.DS_Store
