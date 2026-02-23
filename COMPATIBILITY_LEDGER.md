@@ -47,3 +47,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Preserve backward-compatible `text/importance/category` behavior while extending payloads additively.
 - Impact:
   - OpenClaw bridge can map legacy and enriched store calls without breaking existing tool semantics.
+
+## 2026-02-23 — Feature: `feat(recall-filters): hard filter stage (scope/sensitivity/ttl/time/category/tags)`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Apply mandatory policy checks before ranking, including sensitivity and context boundaries.
+- Impact:
+  - Recall path can be integrated safely with OpenClaw without relying on prompt-only isolation.

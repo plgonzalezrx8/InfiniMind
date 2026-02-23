@@ -59,3 +59,61 @@ class BatchStoreResponse(BaseModel):
     created_count: int
     duplicate_count: int
     results: list[StoreMemoryResult]
+
+
+class RecallRequest(BaseModel):
+    """Payload for memory retrieval with optional hard filters."""
+
+    tenant_id: str = "default"
+    user_id: str
+    agent_id: str = "main"
+    query: str = Field(min_length=1)
+    limit: int = Field(default=5, ge=1, le=100)
+    scope: MemoryScope | None = None
+    channel_id: str | None = None
+    session_id: str | None = None
+    actor_id: str | None = None
+    categories: list[MemoryCategory] = Field(default_factory=list)
+    tags_any: list[str] = Field(default_factory=list)
+    min_importance: float | None = Field(default=None, ge=0.0, le=1.0)
+    since: str | None = None
+    until: str | None = None
+    include_expired: bool = False
+    include_sensitive: bool = False
+    rerank: Literal["off", "hybrid"] = "off"
+    debug: bool = False
+
+
+class RecallItem(BaseModel):
+    """Memory snippet returned to OpenClaw bridge callers."""
+
+    memory_id: str
+    text: str
+    category: str
+    tags: list[str]
+    score: float
+    importance: float
+    scope: str
+    sensitivity: str
+    created_at: str
+    updated_at: str
+    ttl_expires_at: str | None
+    provenance: dict[str, Any]
+    quality: dict[str, Any]
+    embedding_model_id: str
+
+
+class RecallDebug(BaseModel):
+    """Optional debug details for retrieval-stage diagnostics."""
+
+    total_rows: int
+    filtered_rows: int
+    returned_rows: int
+
+
+class RecallResponse(BaseModel):
+    """Final recall response payload."""
+
+    count: int
+    memories: list[RecallItem]
+    debug: RecallDebug | None = None

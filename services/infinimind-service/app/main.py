@@ -1,16 +1,27 @@
 """FastAPI application entrypoint for the InfiniMind service."""
 
 import logging
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
 
-from .api_models import BatchStoreRequest, BatchStoreResponse, StoreMemoryRequest, StoreMemoryResult
+from .api_models import (
+    BatchStoreRequest,
+    BatchStoreResponse,
+    RecallDebug,
+    RecallItem,
+    RecallRequest,
+    RecallResponse,
+    StoreMemoryRequest,
+    StoreMemoryResult,
+)
 from .auth import require_api_key
 from .embeddings import build_embedding_client
 from .memory_schema import MemoryRecord, compute_content_hash
 from .models import HealthResponse
+from .policy import apply_hard_filters
 from .settings import get_settings
 from .storage import LanceMemoryStore
 
@@ -151,3 +162,65 @@ def batch_store(payload: BatchStoreRequest) -> BatchStoreResponse:
         duplicate_count=duplicate_count,
         results=results,
     )
+
+
+def _row_to_recall_item(row: dict, score: float) -> RecallItem:
+    """Convert a raw storage row into the public recall response shape."""
+
+    tags = json.loads(row.get("tags_json") or "[]")
+    conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
+    return RecallItem(
+        memory_id=str(row.get("memory_id")),
+        text=str(row.get("text") or ""),
+        category=str(row.get("category") or "other"),
+        tags=tags,
+        score=score,
+        importance=float(row.get("importance") or 0.0),
+        scope=str(row.get("scope") or "user"),
+        sensitivity=str(row.get("sensitivity") or "low"),
+        created_at=str(row.get("created_at") or ""),
+        updated_at=str(row.get("updated_at") or ""),
+        ttl_expires_at=row.get("ttl_expires_at"),
+        provenance={
+            "source_type": row.get("provenance_source_type"),
+            "source_ref": row.get("provenance_source_ref"),
+        },
+        quality={
+            "confidence": float(row.get("quality_confidence") or 0.0),
+            "verification_status": row.get("quality_verification_status"),
+            "conflict_set": conflict_set,
+        },
+        embedding_model_id=str(row.get("embedding_model_id") or ""),
+    )
+
+
+@app.post("/v1/memory/recall", response_model=RecallResponse, dependencies=[Depends(require_api_key)])
+def recall(payload: RecallRequest) -> RecallResponse:
+    """Recall memories using strict pre-ranking policy filters."""
+
+    rows = app.state.memory_store.list_memories(limit=5000)
+    filtered_rows = apply_hard_filters(rows, payload)
+
+    query_terms = [token for token in payload.query.lower().split() if token]
+    scored: list[tuple[float, dict]] = []
+    for row in filtered_rows:
+        text = str(row.get("text") or "").lower()
+        term_hits = sum(1 for term in query_terms if term in text)
+        lexical_score = term_hits / max(len(query_terms), 1)
+        importance = float(row.get("importance") or 0.0)
+        score = (0.65 * lexical_score) + (0.35 * importance)
+        scored.append((score, row))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    top_rows = scored[: payload.limit]
+    items = [_row_to_recall_item(row, score=score) for score, row in top_rows]
+
+    debug = None
+    if payload.debug:
+        debug = RecallDebug(
+            total_rows=len(rows),
+            filtered_rows=len(filtered_rows),
+            returned_rows=len(items),
+        )
+
+    return RecallResponse(count=len(items), memories=items, debug=debug)
