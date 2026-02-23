@@ -93,3 +93,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Implement strict bridge manifest/config schema with env-var interpolation and bounded timeouts.
 - Impact:
   - OpenClaw can validate bridge config at startup without executing plugin code.
+
+## 2026-02-23 — Feature: `feat(bridge-tools): legacy-compatible memory_store/memory_recall tool mapping`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Keep OpenClaw tool names and legacy params while forwarding additive fields to InfiniMind.
+- Impact:
+  - Existing OpenClaw agent behaviors can migrate to external memory service without prompt changes.
