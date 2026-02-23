@@ -193,3 +193,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Document exact key ownership and mapping across service env, curl auth headers, and OpenClaw bridge config.
 - Impact:
   - Operators now have unambiguous setup steps for `INFINIMIND_API_KEY` and `INFINIMIND_ADMIN_API_KEY`.
+
+## 2026-02-23 — Feature: `docs+tooling: API key generation script and key sourcing guidance`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add a local script to generate InfiniMind service/admin bearer keys and document OpenAI key acquisition explicitly.
+- Impact:
+  - Setup instructions now clearly answer where each key comes from and how to keep values aligned across service, curl, and OpenClaw bridge config.

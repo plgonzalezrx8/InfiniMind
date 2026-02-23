@@ -47,37 +47,37 @@ This repository contains a working MVP implementation on branch `codex/infinimin
 cp .env.example .env
 ```
 
-2. Set values in `.env`:
-
-- `INFINIMIND_API_KEY`: token used by callers like `curl` and OpenClaw bridge
-- `INFINIMIND_ADMIN_API_KEY`: token used for admin endpoint `/v1/admin/reembed`
-- `OPENAI_API_KEY`: required when using `INFINIMIND_EMBEDDING_PROVIDER=openai`
-
-You can generate strong tokens with:
+2. Generate InfiniMind keys (writes into `.env`):
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+python3 scripts/generate_api_keys.py --write-env
 ```
 
-3. Start service:
+3. Create OpenAI key and set it in `.env`:
+
+- Open: `https://platform.openai.com/api-keys`
+- Create a new API key
+- Set `OPENAI_API_KEY=...` in `.env`
+
+4. Start service:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-4. Verify liveness:
+5. Verify liveness:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/health
 ```
 
-5. Verify readiness (auth required):
+6. Verify readiness (auth required):
 
 ```bash
 curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
 ```
 
-6. Verify metrics endpoint:
+7. Verify metrics endpoint:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/metrics | head
@@ -93,6 +93,13 @@ Main service settings (from shell env or `.env`):
 - `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
 - `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
 - `INFINIMIND_OPENAI_API_KEY`: required when provider is `openai`
+
+Use the helper script:
+
+```bash
+python3 scripts/generate_api_keys.py --help
+python3 scripts/generate_api_keys.py --write-env
+```
 
 ### Token mapping (important)
 
@@ -110,7 +117,8 @@ If these do not match exactly, requests fail with `401`.
 
 - Local dev only: any non-empty value is fine (for example `dev-local-token`).
 - Shared/staging/prod: use a random 32+ character secret.
-- Recommended: generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
+- Recommended: `python3 scripts/generate_api_keys.py --write-env`.
+- `OPENAI_API_KEY` must come from OpenAI dashboard: `https://platform.openai.com/api-keys`.
 
 ## API endpoints
 

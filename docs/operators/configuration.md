@@ -6,6 +6,7 @@ From repository root:
 
 ```bash
 cp .env.example .env
+python3 scripts/generate_api_keys.py --write-env
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
@@ -39,8 +40,12 @@ If any of those values differ, requests fail with `401`.
 Recommended key generation command:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+python3 scripts/generate_api_keys.py --write-env
 ```
+
+`OPENAI_API_KEY` must be created in OpenAI dashboard:
+
+- https://platform.openai.com/api-keys
 
 ## OpenClaw configuration file changes
 

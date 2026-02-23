@@ -57,6 +57,12 @@ Important:
 2. Set the same value for the InfiniMind service (`INFINIMIND_API_KEY`).
 3. If these differ, bridge calls fail with `401`.
 
+Key helper script:
+
+```bash
+python3 scripts/generate_api_keys.py --write-env
+```
+
 ## Validation and restart behavior
 
 - OpenClaw uses strict validation for plugin ids, slots, and config schema.
