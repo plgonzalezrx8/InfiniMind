@@ -148,3 +148,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add a standalone benchmark harness comparing rerank modes with p50/p95 and top-1 hit-rate proxies.
 - Impact:
   - Teams can quantify recall quality and latency tradeoffs during canaries and regressions.
+
+## 2026-02-23 — Feature: `docs(ops): OpenClaw config guide, rollout/canary, rollback runbook`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Document exact config keys and operational sequences for plugin slot cutover and rollback.
+- Impact:
+  - Operators can deploy and rollback InfiniMind integration with predictable, validated steps.

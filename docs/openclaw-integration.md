@@ -1,7 +1,65 @@
 # OpenClaw Integration
 
-InfiniMind integrates with OpenClaw through a dedicated bridge plugin.
+InfiniMind integrates with OpenClaw through a dedicated memory plugin:
 
-- The bridge plugin occupies `plugins.slots.memory`.
-- OpenClaw core remains unchanged.
-- The plugin calls the InfiniMind HTTP API.
+- Plugin id: `infinimind-bridge`
+- Slot: `plugins.slots.memory`
+- Protocol: HTTP JSON
+- Service endpoint: `http://infinimind:8080`
+
+This keeps OpenClaw core unchanged while replacing memory tool execution with sidecar calls.
+
+## Integration architecture
+
+1. OpenClaw agent calls `memory_store` or `memory_recall`.
+2. `infinimind-bridge` plugin maps params to InfiniMind API payloads.
+3. InfiniMind enforces hard policy filters and performs retrieval/rerank.
+4. Plugin returns OpenClaw-compatible tool content/details.
+
+## Required OpenClaw config
+
+Update `~/.openclaw/openclaw.json`:
+
+```json5
+{
+  plugins: {
+    enabled: true,
+    load: {
+      paths: ["/absolute/path/to/infinimind-openclaw-bridge"]
+    },
+    allow: ["infinimind-bridge"],
+    slots: {
+      memory: "infinimind-bridge"
+    },
+    entries: {
+      "infinimind-bridge": {
+        enabled: true,
+        config: {
+          baseUrl: "http://infinimind:8080",
+          apiKey: "${INFINIMIND_API_KEY}",
+          timeoutMs: 4000,
+          defaultScope: "user",
+          includeSensitiveDefault: false,
+          rerankDefault: "hybrid",
+          fallbackMode: "legacy-compatible"
+        }
+      }
+    }
+  }
+}
+```
+
+## Validation and restart behavior
+
+- OpenClaw uses strict validation for plugin ids, slots, and config schema.
+- `openclaw.plugin.json` must remain strict (`additionalProperties: false`).
+- For plugin infrastructure changes, restart the OpenClaw gateway to avoid stale plugin state.
+
+## Verification checklist
+
+1. `openclaw plugins list` includes `infinimind-bridge`.
+2. `openclaw plugins doctor` returns no plugin schema errors.
+3. `openclaw plugins info infinimind-bridge` shows enabled status.
+4. Manual tool invocation confirms:
+   - `memory_store` writes return `action: created|duplicate`.
+   - `memory_recall` returns structured memory details.
