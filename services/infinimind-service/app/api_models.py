@@ -80,6 +80,8 @@ class RecallRequest(BaseModel):
     until: str | None = None
     include_expired: bool = False
     include_sensitive: bool = False
+    trust_level: Literal["low", "medium", "high"] = "medium"
+    fallback_mode: Literal["off", "legacy-compatible"] = "legacy-compatible"
     rerank: Literal["off", "hybrid"] = "off"
     debug: bool = False
 
@@ -110,6 +112,8 @@ class RecallDebug(BaseModel):
     total_rows: int
     filtered_rows: int
     returned_rows: int
+    fallback_applied: bool
+    policy_notes: list[str]
 
 
 class RecallResponse(BaseModel):

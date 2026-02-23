@@ -21,7 +21,7 @@ from .auth import require_api_key
 from .embeddings import build_embedding_client
 from .memory_schema import MemoryRecord, compute_content_hash
 from .models import HealthResponse
-from .policy import apply_hard_filters
+from .policy import apply_hard_filters, apply_safe_fallback
 from .retrieval import hybrid_rank
 from .settings import get_settings
 from .storage import LanceMemoryStore
@@ -206,6 +206,20 @@ def recall(payload: RecallRequest) -> RecallResponse:
 
     rows = app.state.memory_store.list_memories(limit=5000)
     filtered_rows = apply_hard_filters(rows, payload)
+    fallback_applied = False
+    policy_notes: list[str] = []
+
+    if payload.include_sensitive and payload.trust_level != "high":
+        policy_notes.append("include_sensitive requested without high trust; high sensitivity excluded")
+
+    if (
+        payload.fallback_mode == "legacy-compatible"
+        and len(filtered_rows) < payload.limit
+        and (payload.categories or payload.tags_any or payload.since or payload.until or payload.scope)
+    ):
+        filtered_rows = apply_safe_fallback(rows, payload)
+        fallback_applied = True
+        policy_notes.append("safe fallback relaxed optional filters")
     items: list[RecallItem]
 
     if payload.rerank == "hybrid":
@@ -252,6 +266,8 @@ def recall(payload: RecallRequest) -> RecallResponse:
             total_rows=len(rows),
             filtered_rows=len(filtered_rows),
             returned_rows=len(items),
+            fallback_applied=fallback_applied,
+            policy_notes=policy_notes,
         )
 
     return RecallResponse(count=len(items), memories=items, debug=debug)

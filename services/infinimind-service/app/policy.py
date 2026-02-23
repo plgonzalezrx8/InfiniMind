@@ -37,6 +37,8 @@ def apply_hard_filters(rows: list[dict[str, Any]], request: RecallRequest) -> li
     since_ts = isoparse(request.since) if request.since else None
     until_ts = isoparse(request.until) if request.until else None
 
+    include_sensitive = request.include_sensitive and request.trust_level == "high"
+
     for row in rows:
         if row.get("tenant_id") != request.tenant_id:
             continue
@@ -55,7 +57,7 @@ def apply_hard_filters(rows: list[dict[str, Any]], request: RecallRequest) -> li
         if request.actor_id and row.get("source_actor") != request.actor_id:
             continue
 
-        if not request.include_sensitive and row.get("sensitivity") == "high":
+        if not include_sensitive and row.get("sensitivity") == "high":
             continue
 
         ttl_expires_at = row.get("ttl_expires_at")
@@ -93,3 +95,26 @@ def apply_hard_filters(rows: list[dict[str, Any]], request: RecallRequest) -> li
         filtered.append(row)
 
     return filtered
+
+
+def apply_safe_fallback(rows: list[dict[str, Any]], request: RecallRequest) -> list[dict[str, Any]]:
+    """Broaden optional filters while preserving hard trust boundaries.
+
+    The fallback mode intentionally keeps tenant/user/agent/sensitivity/ttl checks
+    unchanged, and only relaxes optional narrowing constraints.
+    """
+
+    relaxed_request = request.model_copy(
+        update={
+            "scope": None,
+            "channel_id": None,
+            "session_id": None,
+            "actor_id": None,
+            "categories": [],
+            "tags_any": [],
+            "min_importance": None,
+            "since": None,
+            "until": None,
+        }
+    )
+    return apply_hard_filters(rows, relaxed_request)

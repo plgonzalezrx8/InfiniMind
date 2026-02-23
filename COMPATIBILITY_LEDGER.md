@@ -74,3 +74,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Return structured recall details with explicit scoring diagnostics for auditability.
 - Impact:
   - OpenClaw bridge can expose explainable memory context without changing core OpenClaw behavior.
+
+## 2026-02-23 — Feature: `feat(policy): trust gates and safe fallback behavior`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Enforce high-sensitivity recall only for high-trust callers and apply safe fallback that never bypasses hard boundaries.
+- Impact:
+  - Retrieval can expand candidate coverage without introducing cross-context or sensitivity leakage.
