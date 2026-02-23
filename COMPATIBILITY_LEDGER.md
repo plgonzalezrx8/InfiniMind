@@ -175,3 +175,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Remove obsolete compose `version` key to avoid noisy deploy-time warnings.
 - Impact:
   - Cleaner operator output during sidecar startup and validation.
+
+## 2026-02-23 — Feature: `docs(readme): complete run instructions + MIT license`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Consolidate all operator/developer run instructions into root README and add explicit MIT licensing.
+- Impact:
+  - Repository now has a single comprehensive setup/run reference and clear open-source licensing.
