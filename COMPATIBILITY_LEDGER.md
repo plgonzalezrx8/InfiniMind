@@ -28,3 +28,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Preserve a sidecar deployment model and keep explicit restart expectations for OpenClaw plugin config changes.
 - Impact:
   - Docker-first runtime aligns with operations while keeping OpenClaw plugin behavior predictable.
+
+## 2026-02-23 — Feature: `feat(storage): LanceDB schema v2 and metadata index creation`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/config.ts
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Reuse the same OpenAI embedding model dimension mapping strategy and keep a LanceDB-first storage shape.
+- Impact:
+  - Storage schema is ready for additive metadata and hybrid retrieval phases.

@@ -36,6 +36,25 @@ class Settings(BaseSettings):
 
     request_timeout_ms: int = 4000
 
+    @property
+    def vector_dim(self) -> int:
+        """Return embedding dimensionality for the configured model."""
+
+        dims_by_model = {
+            "text-embedding-3-small": 1536,
+            "text-embedding-3-large": 3072,
+        }
+        dims = dims_by_model.get(self.embedding_model)
+        if dims is None:
+            raise ValueError(f"Unsupported embedding model: {self.embedding_model}")
+        return dims
+
+    @property
+    def lancedb_path(self) -> Path:
+        """Resolve the LanceDB data directory beneath the configured data dir."""
+
+        return self.data_dir / "lancedb"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
