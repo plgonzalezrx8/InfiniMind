@@ -130,3 +130,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Mirror legacy memory tool behavior in API assertions while verifying new policy and fallback controls.
 - Impact:
   - Service regressions around compatibility, safety, and recall packaging are now test-addressable.
+
+## 2026-02-23 — Feature: `test(openclaw): plugin config validation + e2e bridge tests with OpenClaw`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add repository-local contract tests for bridge manifest strictness and slot wiring, plus an executable E2E run script.
+- Impact:
+  - OpenClaw integration regressions can be detected before runtime deployment.

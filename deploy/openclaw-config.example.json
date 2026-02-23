@@ -1,0 +1,26 @@
+{
+  "plugins": {
+    "enabled": true,
+    "load": {
+      "paths": ["/absolute/path/to/infinimind-openclaw-bridge"]
+    },
+    "allow": ["infinimind-bridge"],
+    "slots": {
+      "memory": "infinimind-bridge"
+    },
+    "entries": {
+      "infinimind-bridge": {
+        "enabled": true,
+        "config": {
+          "baseUrl": "http://infinimind:8080",
+          "apiKey": "${INFINIMIND_API_KEY}",
+          "timeoutMs": 4000,
+          "defaultScope": "user",
+          "includeSensitiveDefault": false,
+          "rerankDefault": "hybrid",
+          "fallbackMode": "legacy-compatible"
+        }
+      }
+    }
+  }
+}
