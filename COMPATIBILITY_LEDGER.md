@@ -56,3 +56,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Apply mandatory policy checks before ranking, including sensitivity and context boundaries.
 - Impact:
   - Recall path can be integrated safely with OpenClaw without relying on prompt-only isolation.
+
+## 2026-02-23 — Feature: `feat(recall-hybrid): vector+lexical candidate generation and weighted rerank`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Implement hybrid fusion using BM25-style lexical scoring + vector similarity with explicit weighting.
+- Impact:
+  - Recall can now serve both semantic paraphrases and exact-token queries from one API path.

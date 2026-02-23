@@ -22,6 +22,7 @@ from .embeddings import build_embedding_client
 from .memory_schema import MemoryRecord, compute_content_hash
 from .models import HealthResponse
 from .policy import apply_hard_filters
+from .retrieval import hybrid_rank
 from .settings import get_settings
 from .storage import LanceMemoryStore
 
@@ -200,20 +201,31 @@ def recall(payload: RecallRequest) -> RecallResponse:
 
     rows = app.state.memory_store.list_memories(limit=5000)
     filtered_rows = apply_hard_filters(rows, payload)
+    items: list[RecallItem]
 
-    query_terms = [token for token in payload.query.lower().split() if token]
-    scored: list[tuple[float, dict]] = []
-    for row in filtered_rows:
-        text = str(row.get("text") or "").lower()
-        term_hits = sum(1 for term in query_terms if term in text)
-        lexical_score = term_hits / max(len(query_terms), 1)
-        importance = float(row.get("importance") or 0.0)
-        score = (0.65 * lexical_score) + (0.35 * importance)
-        scored.append((score, row))
+    if payload.rerank == "hybrid":
+        query_vector = app.state.embedding_client.embed(payload.query)
+        ranked = hybrid_rank(
+            filtered_rows,
+            query=payload.query,
+            query_vector=query_vector,
+            limit=payload.limit,
+        )
+        items = [_row_to_recall_item(item["row"], score=float(item["score"])) for item in ranked]
+    else:
+        query_terms = [token for token in payload.query.lower().split() if token]
+        scored: list[tuple[float, dict]] = []
+        for row in filtered_rows:
+            text = str(row.get("text") or "").lower()
+            term_hits = sum(1 for term in query_terms if term in text)
+            lexical_score = term_hits / max(len(query_terms), 1)
+            importance = float(row.get("importance") or 0.0)
+            score = (0.65 * lexical_score) + (0.35 * importance)
+            scored.append((score, row))
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    top_rows = scored[: payload.limit]
-    items = [_row_to_recall_item(row, score=score) for score, row in top_rows]
+        scored.sort(key=lambda item: item[0], reverse=True)
+        top_rows = scored[: payload.limit]
+        items = [_row_to_recall_item(row, score=score) for score, row in top_rows]
 
     debug = None
     if payload.debug:
