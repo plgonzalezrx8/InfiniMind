@@ -157,6 +157,31 @@ class LanceMemoryStore:
         self._table.add([row])
         return record
 
+    def find_duplicate(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        content_hash: str,
+        dedupe_key: str | None,
+    ) -> dict[str, Any] | None:
+        """Find an existing row that matches dedupe constraints."""
+
+        rows = self.list_memories(limit=5000)
+        for row in rows:
+            if row.get("tenant_id") != tenant_id:
+                continue
+            if row.get("user_id") != user_id:
+                continue
+            if row.get("agent_id") != agent_id:
+                continue
+            if dedupe_key and row.get("dedupe_key") == dedupe_key:
+                return row
+            if row.get("content_hash") == content_hash:
+                return row
+        return None
+
     def list_memories(self, limit: int = 5000) -> list[dict[str, Any]]:
         """Return raw rows for retrieval and maintenance workflows."""
 

@@ -37,3 +37,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Reuse the same OpenAI embedding model dimension mapping strategy and keep a LanceDB-first storage shape.
 - Impact:
   - Storage schema is ready for additive metadata and hybrid retrieval phases.
+
+## 2026-02-23 — Feature: `feat(store): /v1/memory/store + /v1/memory/batch-store with additive metadata`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/openclaw.plugin.json
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Preserve backward-compatible `text/importance/category` behavior while extending payloads additively.
+- Impact:
+  - OpenClaw bridge can map legacy and enriched store calls without breaking existing tool semantics.
