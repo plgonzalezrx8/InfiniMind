@@ -202,3 +202,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add a local script to generate InfiniMind service/admin bearer keys and document OpenAI key acquisition explicitly.
 - Impact:
   - Setup instructions now clearly answer where each key comes from and how to keep values aligned across service, curl, and OpenClaw bridge config.
+
+## 2026-02-24 — Feature: `fix(bridge): correct package dependency wiring for installable bridge plugin`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/package.json
+- Decision:
+  - Align bridge package metadata with OpenClaw extension packaging conventions and add explicit typecheck tooling.
+- Impact:
+  - Bridge package now installs successfully and can be validated deterministically before integration.

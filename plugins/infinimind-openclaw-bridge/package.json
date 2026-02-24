@@ -4,8 +4,20 @@
   "type": "module",
   "private": true,
   "main": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "openclaw/plugin-sdk": "*",
     "@sinclair/typebox": "^0.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "openclaw": "latest",
+    "typescript": "^5.8.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
   }
 }
