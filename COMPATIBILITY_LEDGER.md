@@ -464,3 +464,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add deterministic hosted CI jobs for service tests, bridge quality checks, OpenClaw contract checks, and secret regex scanning.
 - Impact:
   - Merge gating can be enforced via stable CI job names instead of manual local-only validation.
+
+## 2026-02-24 — Feature: `feat(ci-docker): add docker-first service smoke workflow`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add a hosted Docker smoke job using mock embeddings and authenticated health/store/recall/forget checks to validate the default operational path.
+- Impact:
+  - Docker-first runtime regressions are now caught early in CI before merge.
