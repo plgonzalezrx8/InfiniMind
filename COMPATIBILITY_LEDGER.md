@@ -436,3 +436,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add concise comments on migration integrity checks, fail-safe JSON normalization, and alias-tool recall mapping constraints.
 - Impact:
   - Complex guardrails remain explicit for maintainers without changing runtime behavior.
+
+## 2026-02-24 — Feature: `test(audit): add regression coverage for iteration-3 fixes`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Expand bridge/openclaw regression checks for alias behavior and pinned dependency contracts to protect the remediation surface.
+- Impact:
+  - Iteration-3 compatibility fixes are now covered by executable tests that catch future drift.

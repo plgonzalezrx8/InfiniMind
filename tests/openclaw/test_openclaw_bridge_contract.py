@@ -78,4 +78,6 @@ def test_bridge_package_contract_for_install_and_typecheck() -> None:
     assert "@sinclair/typebox" in deps
     assert "openclaw/plugin-sdk" not in deps
     assert "openclaw" in dev_deps
+    assert dev_deps["openclaw"] != "latest"
+    assert dev_deps["openclaw"] == "2026.2.22-2"
     assert "typescript" in dev_deps

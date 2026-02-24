@@ -145,3 +145,31 @@ test("memory_search alias maps to recall endpoint and default recall behavior", 
   assert.equal(capturedBody.limit, 2);
   restoreFetch();
 });
+
+test("memory_search alias ignores advanced recall overrides", async () => {
+  const api = new FakePluginApi(baseBridgeConfig({ identityFallback: "error", includeSensitiveDefault: false }));
+  bridgePlugin.register(api as never);
+
+  let capturedBody: Record<string, unknown> = {};
+  const restoreFetch = withMockedFetch(async (_url, init) => {
+    capturedBody = JSON.parse(String(init?.body ?? "{}"));
+    return new Response(JSON.stringify({ count: 0, memories: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  await api.tools.memory_search.execute("tc-5", {
+    query: "deployment history",
+    userId: "search-user",
+    categories: ["fact"],
+    includeSensitive: true,
+    rerank: "off",
+    debug: true,
+  });
+  assert.deepEqual(capturedBody.categories, []);
+  assert.equal(capturedBody.include_sensitive, false);
+  assert.equal(capturedBody.rerank, "hybrid");
+  assert.equal(capturedBody.debug, false);
+  restoreFetch();
+});
