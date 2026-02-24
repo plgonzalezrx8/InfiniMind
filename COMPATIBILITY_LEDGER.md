@@ -580,3 +580,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Enforce service coverage gates in automation (overall + critical-module floors) while expanding unit coverage for auth/dependencies/policy/embeddings/storage compatibility paths.
 - Impact:
   - Beta quality gates now block regressions in high-risk service internals instead of relying on aggregate test counts alone.
+
+## 2026-02-24 — Feature: `test(bridge): add runtime mapping and failure-mode coverage`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Expand bridge unit coverage to assert stable response mapping and explicit upstream error propagation for memory tool calls.
+- Impact:
+  - Bridge runtime behavior is now test-locked for timeout and 401/403/500-style upstream failures, reducing integration ambiguity during beta.
