@@ -11,7 +11,7 @@ This keeps OpenClaw core unchanged while replacing memory tool execution with si
 
 ## Integration architecture
 
-1. OpenClaw agent calls `memory_store` or `memory_recall`.
+1. OpenClaw agent calls `memory_store`, `memory_recall`, or `memory_forget`.
 2. `infinimind-bridge` plugin maps params to InfiniMind API payloads.
 3. InfiniMind enforces hard policy filters and performs retrieval/rerank.
 4. Plugin returns OpenClaw-compatible tool content/details.
@@ -85,3 +85,4 @@ python3 scripts/generate_api_keys.py --write-env
 4. Manual tool invocation confirms:
    - `memory_store` writes return `action: created|duplicate`.
    - `memory_recall` returns structured memory details.
+   - `memory_forget` returns `deleted|candidates|not_found|missing_param`.

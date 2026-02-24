@@ -22,6 +22,10 @@ Main variables used by the service container:
 - `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
 - `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
 - `INFINIMIND_OPENAI_API_KEY`: required for OpenAI embeddings
+- `INFINIMIND_TRACING_ENABLED`: `true`/`false` (default `false`)
+- `INFINIMIND_TRACING_EXPORTER`: `otlp` or `console` (default `otlp`)
+- `INFINIMIND_TRACING_OTLP_ENDPOINT`: required when tracing enabled with `otlp`
+- `INFINIMIND_TRACING_SERVICE_NAME`: span service name (default `infinimind-service`)
 
 ## Key setup (no ambiguity)
 
@@ -86,4 +90,6 @@ Reference JSON example: [openclaw-config.example.json](/Users/pedrogonzalez/Casc
 - Liveness: `GET /v1/health`
 - Readiness (auth): `GET /v1/ready`
 - Metrics: `GET /v1/metrics`
+- Forget workflow: `POST /v1/memory/forget` with `query` then delete via `memory_id`
 - Dry-run migration: `POST /v1/admin/reembed` with `dry_run=true`
+- Migration completeness: confirm `memories_v3` row count matches legacy `memories_v2` before cutover

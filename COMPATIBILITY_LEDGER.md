@@ -346,3 +346,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Update README architecture, API list, examples, and env guidance to match current store/recall/forget behavior and optional tracing controls.
 - Impact:
   - Primary project documentation now matches implemented runtime capabilities and OpenClaw config semantics.
+
+## 2026-02-24 — Feature: `docs(ops): update operator docs and env template for tracing + verification`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Add tracing environment documentation, forget verification steps, and migration completeness checks across operator-facing docs/config templates.
+- Impact:
+  - Docker-first operators now have complete runtime and verification guidance for tracing and memory lifecycle operations.

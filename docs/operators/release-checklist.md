@@ -33,6 +33,7 @@ Use this checklist before merging `codex/infinimind-mvp` into `main`.
 - Validate bridge package checks:
   - `npm install --no-audit --no-fund` (inside `plugins/infinimind-openclaw-bridge`)
   - `npm run typecheck` (inside `plugins/infinimind-openclaw-bridge`)
+  - `npm run test` (inside `plugins/infinimind-openclaw-bridge`)
 - Ensure OpenClaw config references only discoverable plugin ids.
 - Run `openclaw plugins doctor` after enabling `infinimind-bridge`.
 - Ensure bridge config uses `identityFallback: "error"` unless a deliberate `defaultUserId` is configured.
