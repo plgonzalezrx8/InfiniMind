@@ -46,6 +46,7 @@ run_docker_smoke() {
 }
 
 run_openclaw_e2e() {
+  # Keep E2E pytest opt-in explicit so normal contract test runs stay lightweight.
   RUN_OPENCLAW_E2E=1 python3 -m pytest tests/openclaw/test_openclaw_cli_e2e.py -q
 }
 
@@ -69,6 +70,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "${#checks[@]}" -eq 0 ]]; then
+  # Default set mirrors required quality gates except the heavier docker/e2e checks.
   checks=(service-tests bridge-quality openclaw-contract secret-scan)
 fi
 

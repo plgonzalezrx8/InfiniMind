@@ -38,6 +38,7 @@ if [[ "${ALLOW_REAL_KEYS}" != "1" ]]; then
 fi
 
 if [[ "${KEEP_STACK}" -eq 0 ]]; then
+  # Default cleanup keeps local/CI runs repeatable without manual container teardown.
   cleanup() {
     docker compose -f "${COMPOSE_FILE}" down -v >/dev/null 2>&1 || true
   }

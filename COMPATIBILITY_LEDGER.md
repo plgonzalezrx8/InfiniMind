@@ -520,3 +520,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Document CI/local parity through shared gate scripts, enforce profile-isolated OpenClaw checks, and make required hosted check names explicit for merge protection.
 - Impact:
   - Operators now have copy-paste-safe instructions that match executable automation and reduce plugin/slot misconfiguration drift.
+
+## 2026-02-24 — Feature: `chore(comments): annotate non-obvious CI/E2E safety paths`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+- Decision:
+  - Add concise inline comments around profile isolation, fail-fast plugin verification order, and token-safety guardrails to preserve OpenClaw integration invariants.
+- Impact:
+  - CI/E2E scripts are easier to maintain without changing runtime behavior or plugin contracts.

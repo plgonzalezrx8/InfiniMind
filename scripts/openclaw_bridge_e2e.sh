@@ -110,6 +110,7 @@ if [[ "${SKIP_COMPOSE}" -eq 0 ]]; then
 fi
 
 if [[ -z "${INFINIMIND_API_KEY:-}" ]]; then
+  # Generate an ephemeral token when compose is skipped and no caller token is provided.
   INFINIMIND_API_KEY="$(python3 - <<'PY'
 import secrets
 print(secrets.token_urlsafe(24))
@@ -146,6 +147,7 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# Keep E2E config isolated from default ~/.openclaw state.
 PROFILE_DIR="${HOME}/.openclaw-${PROFILE}"
 CONFIG_PATH="${PROFILE_DIR}/openclaw.json"
 mkdir -p "${PROFILE_DIR}"
@@ -189,6 +191,7 @@ config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 PY
 
 echo "Running OpenClaw plugin checks on profile '${PROFILE}'..."
+# Assert plugin discovery first so later checks fail for the correct root cause.
 LIST_OUTPUT="$("${OPENCLAW_BIN}" --profile "${PROFILE}" plugins list)"
 echo "${LIST_OUTPUT}"
 if ! grep -q "infinimind-bridge" <<<"${LIST_OUTPUT}"; then
@@ -205,6 +208,7 @@ if ! grep -q "infinimind-bridge" <<<"${INFO_OUTPUT}"; then
   exit 1
 fi
 
+# Confirm slot ownership explicitly to catch stale config after plugin discovery succeeds.
 SLOT_VALUE="$("${OPENCLAW_BIN}" --profile "${PROFILE}" config get plugins.slots.memory || true)"
 if ! grep -q "infinimind-bridge" <<<"${SLOT_VALUE}"; then
   echo "Memory slot is not configured for infinimind-bridge in profile ${PROFILE}." >&2
