@@ -482,3 +482,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Replace the echo-only script with an executable profile-isolated E2E runner that writes scoped config, validates plugin discovery/doctor/info, and fails fast on setup drift.
 - Impact:
   - OpenClaw bridge integration checks are now runnable in CI/local without touching default user profiles.
+
+## 2026-02-24 — Feature: `test(openclaw-e2e): add CI-safe bridge integration test harness`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Add an env-gated pytest harness and dedicated workflow that runs profile-isolated bridge checks without channel dependencies.
+- Impact:
+  - OpenClaw bridge integration can be validated in hosted CI with deterministic setup and failure reporting.
