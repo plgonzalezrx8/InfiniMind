@@ -245,7 +245,19 @@ def _row_to_recall_item(
     """Convert a raw storage row into the public recall response shape."""
 
     memory_id = str(row.get("memory_id") or "unknown")
-    tags = json.loads(row.get("tags_json") or "[]")
+    tags: list[str]
+    try:
+        parsed_tags = json.loads(row.get("tags_json") or "[]")
+        if isinstance(parsed_tags, list):
+            tags = [str(tag) for tag in parsed_tags]
+        else:
+            LOGGER.warning("Invalid tags_json type for memory_id=%s; defaulting to empty tags", memory_id)
+            tags = []
+    except Exception:
+        # Corrupted stored JSON should never take recall offline.
+        LOGGER.warning("Invalid tags_json for memory_id=%s; defaulting to empty tags", memory_id)
+        tags = []
+
     metadata: dict[str, object]
     try:
         parsed_metadata = json.loads(row.get("metadata_json") or "{}")
@@ -257,7 +269,22 @@ def _row_to_recall_item(
         # Corrupted legacy rows should degrade gracefully to preserve recall availability.
         LOGGER.warning("Invalid metadata_json for memory_id=%s; defaulting to empty metadata", memory_id)
         metadata = {}
-    conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
+
+    conflict_set: list[str]
+    try:
+        parsed_conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
+        if isinstance(parsed_conflict_set, list):
+            conflict_set = [str(item) for item in parsed_conflict_set]
+        else:
+            LOGGER.warning(
+                "Invalid quality_conflict_set_json type for memory_id=%s; defaulting to empty conflict_set",
+                memory_id,
+            )
+            conflict_set = []
+    except Exception:
+        LOGGER.warning("Invalid quality_conflict_set_json for memory_id=%s; defaulting to empty conflict_set", memory_id)
+        conflict_set = []
+
     return RecallItem(
         memory_id=memory_id,
         text=str(row.get("text") or ""),

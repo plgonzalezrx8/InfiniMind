@@ -345,3 +345,48 @@ def test_recall_handles_invalid_metadata_json(client, auth_headers):
     body = recall.json()
     assert body["count"] >= 1
     assert body["memories"][0]["metadata"] == {}
+
+
+def test_recall_handles_invalid_tags_and_conflict_json(client, auth_headers):
+    """Corrupt tags/conflict-set payloads should normalize to empty lists."""
+
+    store = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "corrupt-lists-user",
+            "agent_id": "main",
+            "text": "Corrupt list JSON guard test.",
+            "category": "fact",
+            "tags": ["ops"],
+            "quality": {"confidence": 0.8, "verification_status": "unverified", "conflict_set": ["a"]},
+        },
+        headers=auth_headers,
+    )
+    assert store.status_code == 200
+    memory_id = store.json()["memory_id"]
+
+    # Tests run in in-memory mode; mutate raw row payload to emulate corrupted stored JSON.
+    for row in client.app.state.memory_store._rows:
+        if row.get("memory_id") == memory_id:
+            row["tags_json"] = "{bad-json"
+            row["quality_conflict_set_json"] = "{bad-json"
+            break
+
+    recall = client.post(
+        "/v1/memory/recall",
+        json={
+            "tenant_id": "default",
+            "user_id": "corrupt-lists-user",
+            "agent_id": "main",
+            "query": "Corrupt list JSON",
+            "limit": 3,
+            "rerank": "hybrid",
+        },
+        headers=auth_headers,
+    )
+    assert recall.status_code == 200
+    body = recall.json()
+    assert body["count"] >= 1
+    assert body["memories"][0]["tags"] == []
+    assert body["memories"][0]["quality"]["conflict_set"] == []

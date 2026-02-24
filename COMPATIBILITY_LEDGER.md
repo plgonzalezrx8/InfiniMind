@@ -391,3 +391,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Prefer scanner/batch iteration for legacy row migration and enforce scanned/migrated integrity checks before declaring success.
 - Impact:
   - Large legacy migrations reduce memory pressure and fail fast on incomplete scans.
+
+## 2026-02-24 — Feature: `fix(service): harden recall JSON decoding for tags/conflict fields`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Treat malformed list-like recall payload fields (`tags_json`, `quality_conflict_set_json`) as non-fatal and normalize them to empty lists with scoped warnings.
+- Impact:
+  - Corrupt row JSON no longer causes recall-time crashes or invalid response shapes.
