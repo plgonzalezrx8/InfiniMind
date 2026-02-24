@@ -600,3 +600,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep profile-isolated OpenClaw discovery/slot checks and add executable bridge tool assertions (store/recall/search/forget) against the live service path.
 - Impact:
   - E2E validation now covers both plugin wiring and functional memory tool behavior before beta rollout.
+
+## 2026-02-24 — Feature: `chore(ci): enforce beta required checks as merge-blocking jobs`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Consolidate required quality jobs into one canonical workflow so branch protection can require a stable set of gate names.
+- Impact:
+  - Merge policy can now enforce service, bridge, contract, secret, docker-smoke, and OpenClaw E2E gates from a single deterministic workflow definition.
