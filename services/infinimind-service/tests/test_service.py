@@ -137,6 +137,21 @@ def test_admin_reembed_dry_run(client, auth_headers, admin_headers):
     assert body["processed"] >= 1
 
 
+def test_admin_reembed_empty_store_noop(client, admin_headers):
+    """Re-embed should no-op cleanly when no rows exist."""
+
+    response = client.post(
+        "/v1/admin/reembed",
+        json={"target_model_id": "text-embedding-3-large", "dry_run": False},
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dry_run"] is False
+    assert body["processed"] == 0
+    assert body["shadow_table"] is None
+
+
 def test_metrics_endpoint(client):
     """Prometheus endpoint should expose InfiniMind metric series."""
 

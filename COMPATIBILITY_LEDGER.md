@@ -247,3 +247,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Move date parsing/ordering checks into request validation and run policy comparisons against normalized UTC datetimes.
 - Impact:
   - Malformed or inverted date windows now return validation errors instead of runtime exceptions.
+
+## 2026-02-24 — Feature: `fix(reembed): handle empty datasets as safe no-op`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Return early for zero-row re-embed jobs and avoid empty shadow-table writes.
+- Impact:
+  - Admin re-embed endpoint now behaves deterministically on empty datasets without backend errors.

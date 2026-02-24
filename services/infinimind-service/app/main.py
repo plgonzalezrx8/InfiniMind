@@ -125,6 +125,14 @@ def reembed(payload: ReembedRequest) -> ReembedResponse:
 
     settings = get_settings()
     rows = app.state.memory_store.list_memories(limit=payload.limit)
+    if len(rows) == 0:
+        return ReembedResponse(
+            target_model_id=payload.target_model_id,
+            processed=0,
+            dry_run=payload.dry_run,
+            shadow_table=None,
+        )
+
     if payload.dry_run:
         return ReembedResponse(
             target_model_id=payload.target_model_id,

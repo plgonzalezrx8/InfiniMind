@@ -263,7 +263,7 @@ class LanceMemoryStore:
         target_model_id: str,
         rows: list[dict[str, Any]],
         vectors: list[list[float]],
-    ) -> str:
+    ) -> str | None:
         """Write shadow embeddings to a separate table for safe migrations."""
 
         self.ensure_initialized()
@@ -278,6 +278,9 @@ class LanceMemoryStore:
             copied["embedding_model_id"] = target_model_id
             copied["vector"] = vector
             shadow_rows.append(copied)
+
+        if not shadow_rows:
+            return None
 
         if self._in_memory_mode:
             self._shadow_tables[table_name] = shadow_rows
