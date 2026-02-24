@@ -18,7 +18,7 @@ E2E_SCRIPT = REPO_ROOT / "scripts" / "openclaw_bridge_e2e.sh"
     reason="Set RUN_OPENCLAW_E2E=1 to run OpenClaw CLI E2E integration checks.",
 )
 def test_openclaw_bridge_cli_e2e_harness() -> None:
-    """Run the executable bridge E2E script with an isolated profile."""
+    """Run the executable bridge E2E script with isolated profile and tool assertions."""
 
     profile = f"infinimind-ci-{uuid4().hex[:8]}"
     env = os.environ.copy()
@@ -41,3 +41,5 @@ def test_openclaw_bridge_cli_e2e_harness() -> None:
             "OpenClaw bridge E2E script failed.\n"
             f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}"
         )
+    assert "Bridge tool execution checks completed successfully." in result.stdout
+    assert "OpenClaw bridge E2E checks completed successfully." in result.stdout

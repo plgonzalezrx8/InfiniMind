@@ -590,3 +590,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Expand bridge unit coverage to assert stable response mapping and explicit upstream error propagation for memory tool calls.
 - Impact:
   - Bridge runtime behavior is now test-locked for timeout and 401/403/500-style upstream failures, reducing integration ambiguity during beta.
+
+## 2026-02-24 — Feature: `feat(e2e): execute OpenClaw memory tools in isolated-profile harness`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/memory.md
+- Decision:
+  - Keep profile-isolated OpenClaw discovery/slot checks and add executable bridge tool assertions (store/recall/search/forget) against the live service path.
+- Impact:
+  - E2E validation now covers both plugin wiring and functional memory tool behavior before beta rollout.

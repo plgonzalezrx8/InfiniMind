@@ -11,6 +11,7 @@ PLUGIN_PATH="${ROOT_DIR}/plugins/infinimind-openclaw-bridge"
 OPENCLAW_BIN="${OPENCLAW_BIN:-openclaw}"
 SKIP_COMPOSE=0
 KEEP_STACK=0
+SKIP_TOOL_EXEC=0
 
 redact_value() {
   local raw="${1:-}"
@@ -45,6 +46,7 @@ Options:
   --openclaw-bin <bin>    OpenClaw executable (default: openclaw or OPENCLAW_BIN)
   --skip-compose          Skip docker compose startup/teardown
   --keep-stack            Keep docker compose stack running after checks
+  --skip-tool-exec        Skip bridge tool execution assertions
   -h, --help              Show this help
 EOF
 }
@@ -73,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --keep-stack)
       KEEP_STACK=1
+      shift
+      ;;
+    --skip-tool-exec)
+      SKIP_TOOL_EXEC=1
       shift
       ;;
     -h|--help)
@@ -213,6 +219,128 @@ SLOT_VALUE="$("${OPENCLAW_BIN}" --profile "${PROFILE}" config get plugins.slots.
 if ! grep -q "infinimind-bridge" <<<"${SLOT_VALUE}"; then
   echo "Memory slot is not configured for infinimind-bridge in profile ${PROFILE}." >&2
   exit 1
+fi
+
+if [[ "${SKIP_TOOL_EXEC}" -eq 0 ]]; then
+  TSX_BIN="${PLUGIN_PATH}/node_modules/.bin/tsx"
+  if [[ ! -x "${TSX_BIN}" ]]; then
+    echo "Bridge tool execution requires tsx at ${TSX_BIN}. Run npm ci in plugin directory." >&2
+    exit 1
+  fi
+
+  echo "Executing bridge tool calls (store/recall/search/forget) against live service..."
+  INFINIMIND_PLUGIN_PATH="${PLUGIN_PATH}" \
+  INFINIMIND_BASE_URL="${BASE_URL}" \
+  INFINIMIND_TOOL_API_KEY="${INFINIMIND_API_KEY}" \
+  "${TSX_BIN}" <<'TS'
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+type ToolDef = {
+  name: string;
+  execute: (toolCallId: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+};
+
+class FakePluginApi {
+  pluginConfig: Record<string, unknown>;
+  logger = {
+    info: (..._args: unknown[]) => {
+      // Keep E2E output concise.
+    },
+  };
+  tools: Record<string, ToolDef> = {};
+
+  constructor(config: Record<string, unknown>) {
+    this.pluginConfig = config;
+  }
+
+  registerTool(tool: ToolDef): void {
+    this.tools[tool.name] = tool;
+  }
+
+  registerService(): void {
+    // Service lifecycle is not required for request assertions.
+  }
+}
+
+const pluginPath = process.env.INFINIMIND_PLUGIN_PATH;
+const baseUrl = process.env.INFINIMIND_BASE_URL;
+const apiKey = process.env.INFINIMIND_TOOL_API_KEY;
+if (!pluginPath || !baseUrl || !apiKey) {
+  throw new Error("Missing required env vars for bridge tool execution");
+}
+
+const pluginModule = await import(pathToFileURL(path.join(pluginPath, "index.ts")).href);
+const bridgePlugin = pluginModule.default;
+if (!bridgePlugin || typeof bridgePlugin.register !== "function") {
+  throw new Error("Failed to load bridge plugin register function");
+}
+
+const api = new FakePluginApi({
+  baseUrl,
+  apiKey,
+  timeoutMs: 4000,
+  defaultScope: "user",
+  includeSensitiveDefault: false,
+  rerankDefault: "hybrid",
+  fallbackMode: "legacy-compatible",
+  identityFallback: "error",
+});
+bridgePlugin.register(api as never);
+
+for (const toolName of ["memory_store", "memory_recall", "memory_search", "memory_forget"]) {
+  if (!api.tools[toolName]) {
+    throw new Error(`Bridge did not register expected tool: ${toolName}`);
+  }
+}
+
+const suffix = randomUUID().slice(0, 8);
+const userId = `e2e-user-${suffix}`;
+const uniquePhrase = `e2e-remember-${suffix}`;
+
+const storeResult = (await api.tools.memory_store.execute("tc-store", {
+  userId,
+  tenantId: "default",
+  agentId: "main",
+  category: "fact",
+  text: `Bridge E2E memory ${uniquePhrase}`,
+  tags: ["e2e", suffix],
+})) as any;
+assert.equal(storeResult.details.action, "created");
+const memoryId = String(storeResult.details.id);
+assert.ok(memoryId.length > 0, "store result missing memory id");
+
+const recallResult = (await api.tools.memory_recall.execute("tc-recall", {
+  userId,
+  tenantId: "default",
+  agentId: "main",
+  query: uniquePhrase,
+  limit: 5,
+})) as any;
+assert.ok(Number(recallResult.details.count) >= 1, "recall returned no memories");
+
+const searchResult = (await api.tools.memory_search.execute("tc-search", {
+  userId,
+  tenantId: "default",
+  agentId: "main",
+  query: uniquePhrase,
+  limit: 5,
+})) as any;
+assert.ok(Number(searchResult.details.count) >= 1, "memory_search returned no memories");
+
+const forgetResult = (await api.tools.memory_forget.execute("tc-forget", {
+  userId,
+  tenantId: "default",
+  agentId: "main",
+  memoryId,
+})) as any;
+assert.equal(forgetResult.details.action, "deleted");
+assert.equal(String(forgetResult.details.id), memoryId);
+
+console.log("Bridge tool execution checks completed successfully.");
+TS
 fi
 
 echo "OpenClaw bridge E2E checks completed successfully."
