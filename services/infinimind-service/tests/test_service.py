@@ -222,3 +222,34 @@ def test_forget_endpoint_paths(client, auth_headers):
     )
     assert not_found.status_code == 200
     assert not_found.json()["action"] == "not_found"
+
+
+def test_recall_invalid_date_filters_return_422(client, auth_headers):
+    """Malformed or inverted date filters should fail validation before policy logic."""
+
+    malformed = client.post(
+        "/v1/memory/recall",
+        json={
+            "tenant_id": "default",
+            "user_id": "user-1",
+            "agent_id": "main",
+            "query": "any",
+            "since": "not-a-date",
+        },
+        headers=auth_headers,
+    )
+    assert malformed.status_code == 422
+
+    inverted = client.post(
+        "/v1/memory/recall",
+        json={
+            "tenant_id": "default",
+            "user_id": "user-1",
+            "agent_id": "main",
+            "query": "any",
+            "since": "2026-01-10T00:00:00Z",
+            "until": "2026-01-09T00:00:00Z",
+        },
+        headers=auth_headers,
+    )
+    assert inverted.status_code == 422

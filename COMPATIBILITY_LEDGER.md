@@ -238,3 +238,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Register a bridge-side memory_forget tool that mirrors memory-lancedb behavior and calls the external forget endpoint.
 - Impact:
   - OpenClaw agents can invoke memory_forget through InfiniMind without changing tool naming conventions.
+
+## 2026-02-24 — Feature: `fix(service): validate recall date filters and eliminate parse-time 500s`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Move date parsing/ordering checks into request validation and run policy comparisons against normalized UTC datetimes.
+- Impact:
+  - Malformed or inverted date windows now return validation errors instead of runtime exceptions.

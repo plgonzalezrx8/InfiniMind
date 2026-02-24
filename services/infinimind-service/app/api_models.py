@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .memory_schema import MemoryCategory, MemoryScope, MemorySensitivity, MemoryProvenance, MemoryQuality
 
@@ -76,14 +76,22 @@ class RecallRequest(BaseModel):
     categories: list[MemoryCategory] = Field(default_factory=list)
     tags_any: list[str] = Field(default_factory=list)
     min_importance: float | None = Field(default=None, ge=0.0, le=1.0)
-    since: str | None = None
-    until: str | None = None
+    since: datetime | None = None
+    until: datetime | None = None
     include_expired: bool = False
     include_sensitive: bool = False
     trust_level: Literal["low", "medium", "high"] = "medium"
     fallback_mode: Literal["off", "legacy-compatible"] = "legacy-compatible"
     rerank: Literal["off", "hybrid"] = "off"
     debug: bool = False
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "RecallRequest":
+        """Ensure recall time windows are chronologically valid when provided."""
+
+        if self.since and self.until and self.since > self.until:
+            raise ValueError("since must be less than or equal to until")
+        return self
 
 
 class RecallItem(BaseModel):

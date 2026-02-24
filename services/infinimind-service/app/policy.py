@@ -12,6 +12,17 @@ from .api_models import RecallRequest
 
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize datetimes to UTC and make naive timestamps explicit UTC."""
+
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+
 def _is_expired(ttl_expires_at: str | None) -> bool:
     """Return true when ttl_expires_at is in the past."""
 
@@ -34,8 +45,8 @@ def apply_hard_filters(rows: list[dict[str, Any]], request: RecallRequest) -> li
 
     filtered: list[dict[str, Any]] = []
 
-    since_ts = isoparse(request.since) if request.since else None
-    until_ts = isoparse(request.until) if request.until else None
+    since_ts = _as_utc(request.since)
+    until_ts = _as_utc(request.until)
 
     include_sensitive = request.include_sensitive and request.trust_level == "high"
 
@@ -83,13 +94,13 @@ def apply_hard_filters(rows: list[dict[str, Any]], request: RecallRequest) -> li
                 continue
 
         try:
-            created_at = isoparse(str(row.get("created_at")))
+            created_at = _as_utc(isoparse(str(row.get("created_at"))))
         except Exception:
             continue
 
-        if since_ts and created_at < since_ts:
+        if since_ts and created_at and created_at < since_ts:
             continue
-        if until_ts and created_at > until_ts:
+        if until_ts and created_at and created_at > until_ts:
             continue
 
         filtered.append(row)
