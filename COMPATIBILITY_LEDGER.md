@@ -364,3 +364,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add concise comments around identity precedence and fail-safe recall/delete behavior without changing runtime contracts.
 - Impact:
   - Complex control-flow decisions are easier to maintain while preserving existing behavior.
+
+## 2026-02-24 — Feature: `chore(release): final verification + compatibility ledger updates`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Re-run full validation gates (service/openclaw tests, bridge typecheck/tests, secret scans) and record final compatibility checks.
+- Impact:
+  - Branch is validated against the remediation acceptance criteria with auditable verification history.
