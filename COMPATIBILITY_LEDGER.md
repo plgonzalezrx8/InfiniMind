@@ -319,3 +319,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Migrate in fixed-size batches with explicit source/destination row-count checks and migration logging.
 - Impact:
   - Large legacy datasets can migrate fully to v3 without silent truncation or single-shot write risk.
+
+## 2026-02-24 — Feature: `fix(service): harden metadata_json parsing in recall path`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Treat malformed metadata payloads as non-fatal and return empty metadata with memory-id scoped warnings.
+- Impact:
+  - Corrupt row metadata no longer causes recall-time failures.

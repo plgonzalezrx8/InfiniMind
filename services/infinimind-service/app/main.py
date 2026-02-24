@@ -244,11 +244,20 @@ def _row_to_recall_item(
 ) -> RecallItem:
     """Convert a raw storage row into the public recall response shape."""
 
+    memory_id = str(row.get("memory_id") or "unknown")
     tags = json.loads(row.get("tags_json") or "[]")
-    metadata = json.loads(row.get("metadata_json") or "{}")
+    metadata: dict[str, object]
+    try:
+        parsed_metadata = json.loads(row.get("metadata_json") or "{}")
+        metadata = parsed_metadata if isinstance(parsed_metadata, dict) else {}
+        if not isinstance(parsed_metadata, dict):
+            LOGGER.warning("Invalid metadata_json type for memory_id=%s; defaulting to empty metadata", memory_id)
+    except Exception:
+        LOGGER.warning("Invalid metadata_json for memory_id=%s; defaulting to empty metadata", memory_id)
+        metadata = {}
     conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
     return RecallItem(
-        memory_id=str(row.get("memory_id")),
+        memory_id=memory_id,
         text=str(row.get("text") or ""),
         category=str(row.get("category") or "other"),
         tags=tags,

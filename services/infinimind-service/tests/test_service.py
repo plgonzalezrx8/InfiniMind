@@ -303,3 +303,45 @@ def test_metadata_roundtrip_on_store_and_recall(client, auth_headers):
     body = recall.json()
     assert body["count"] >= 1
     assert body["memories"][0]["metadata"]["ticket"] == "INC-42"
+
+
+def test_recall_handles_invalid_metadata_json(client, auth_headers):
+    """Corrupt metadata payloads should fail-safe to empty metadata instead of 500."""
+
+    store = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "corrupt-metadata-user",
+            "agent_id": "main",
+            "text": "Corrupt metadata guard test.",
+            "category": "fact",
+            "metadata": {"healthy": True},
+        },
+        headers=auth_headers,
+    )
+    assert store.status_code == 200
+    memory_id = store.json()["memory_id"]
+
+    # Tests run in in-memory mode; mutate raw row payload to emulate corrupted stored JSON.
+    for row in client.app.state.memory_store._rows:
+        if row.get("memory_id") == memory_id:
+            row["metadata_json"] = "{bad-json"
+            break
+
+    recall = client.post(
+        "/v1/memory/recall",
+        json={
+            "tenant_id": "default",
+            "user_id": "corrupt-metadata-user",
+            "agent_id": "main",
+            "query": "Corrupt metadata",
+            "limit": 3,
+            "rerank": "hybrid",
+        },
+        headers=auth_headers,
+    )
+    assert recall.status_code == 200
+    body = recall.json()
+    assert body["count"] >= 1
+    assert body["memories"][0]["metadata"] == {}
