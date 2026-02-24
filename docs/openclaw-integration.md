@@ -1,30 +1,63 @@
-# OpenClaw Integration
+# OpenClaw Integration Guide
 
-InfiniMind integrates with OpenClaw through a dedicated memory plugin:
+This guide describes how to integrate InfiniMind with OpenClaw through a standalone bridge plugin, without modifying OpenClaw core.
 
-- Plugin id: `infinimind-bridge`
-- Slot: `plugins.slots.memory`
-- Protocol: HTTP JSON
-- Service endpoint: `http://infinimind:8080`
+## Scope
 
-This keeps OpenClaw core unchanged while replacing memory tool execution with sidecar calls.
+This guide covers:
 
-## Integration architecture
+- plugin registration and strict config wiring
+- memory slot takeover and compatibility tool behavior
+- identity resolution and safety defaults
+- profile-isolated validation commands
+- troubleshooting for common integration failures
 
-1. OpenClaw agent calls `memory_store`, `memory_recall`, `memory_forget`, or `memory_search`.
-2. `infinimind-bridge` plugin maps params to InfiniMind API payloads.
-3. InfiniMind enforces hard policy filters and performs retrieval/rerank.
-4. Plugin returns OpenClaw-compatible tool content/details.
+This guide does not cover:
 
-Tool compatibility:
+- OpenClaw core code changes
+- `memory_get` implementation in this bridge
 
-- Legacy compatibility tools: `memory_store`, `memory_recall`, `memory_forget`
-- Alias for newer naming: `memory_search` (mapped to `/v1/memory/recall`)
-- Out of scope in this bridge: `memory_get` (file-backed core memory behavior)
+## Integration Model
 
-## Required OpenClaw config
+InfiniMind integrates as an external memory provider:
 
-Update `~/.openclaw/openclaw.json`:
+1. OpenClaw resolves plugin config from `~/.openclaw/openclaw.json`.
+2. OpenClaw loads `infinimind-bridge` plugin from configured path.
+3. OpenClaw routes memory slot tool invocations to the bridge.
+4. Bridge calls InfiniMind service over HTTP.
+5. Bridge maps InfiniMind responses to OpenClaw-compatible tool output.
+
+### Supported tool surface
+
+- `memory_store`
+- `memory_recall`
+- `memory_forget`
+- `memory_search` (alias to recall path)
+
+Out of scope:
+
+- `memory_get` (file-backed core memory semantics)
+
+## Prerequisites
+
+- InfiniMind service reachable from OpenClaw runtime (`baseUrl`).
+- Bridge package dependencies installed:
+
+```bash
+cd plugins/infinimind-openclaw-bridge
+npm ci --no-audit --no-fund
+```
+
+- `INFINIMIND_API_KEY` exported in OpenClaw process environment.
+- OpenClaw version with plugin slot support and strict plugin validation.
+
+## Required OpenClaw Configuration
+
+Target config file:
+
+- `~/.openclaw/openclaw.json` (JSON5 accepted)
+
+### Canonical configuration snippet
 
 ```json5
 {
@@ -49,6 +82,8 @@ Update `~/.openclaw/openclaw.json`:
           rerankDefault: "hybrid",
           fallbackMode: "legacy-compatible",
           identityFallback: "error"
+          // Optional only when identityFallback is "configured-default":
+          // defaultUserId: "fallback-user"
         }
       }
     }
@@ -56,20 +91,73 @@ Update `~/.openclaw/openclaw.json`:
 }
 ```
 
-`apiKey: "${INFINIMIND_API_KEY}"` means OpenClaw resolves the value from its process environment.
+### Field semantics
 
-Important:
+- `baseUrl`:
+  - InfiniMind service base URL the bridge uses.
+  - examples:
+    - compose network: `http://infinimind:8080`
+    - host-local: `http://127.0.0.1:8080`
+- `apiKey`:
+  - bearer token sent by bridge to InfiniMind service.
+  - supports environment interpolation `${ENV_VAR}`.
+- `timeoutMs`:
+  - per-request timeout for bridge HTTP calls.
+  - accepted range: `100` to `120000`.
+- `defaultScope`:
+  - fallback scope when tool caller omits scope.
+  - allowed: `global`, `user`, `channel`, `session`.
+- `includeSensitiveDefault`:
+  - default sensitivity inclusion behavior for recall requests.
+- `rerankDefault`:
+  - default rerank mode when caller omits explicit value.
+  - allowed: `off`, `hybrid`.
+- `fallbackMode`:
+  - default safe fallback behavior.
+  - allowed: `off`, `legacy-compatible`.
+- `identityFallback`:
+  - behavior when identity fields are missing.
+  - allowed: `error`, `configured-default`.
+- `defaultUserId`:
+  - required when `identityFallback=configured-default`.
 
-1. Set `INFINIMIND_API_KEY` in the environment where OpenClaw runs.
-2. Set the same value for the InfiniMind service (`INFINIMIND_API_KEY`).
-3. If these differ, bridge calls fail with `401`.
-4. `identityFallback: "error"` is recommended to avoid accidental user-identity collapse.
+## Identity Resolution Rules
 
-If you explicitly choose `identityFallback: "configured-default"`, you must also set:
+Bridge identity precedence:
 
-```json5
-defaultUserId: "some-explicit-user-id"
-```
+1. `userId`
+2. `actorId`
+3. `sessionId`
+4. `channelId`
+
+Recommended production default:
+
+- `identityFallback: "error"`
+
+Reason:
+
+- prevents silent identity collapse and cross-user mixing when callers omit identity.
+
+Optional fallback mode:
+
+- `identityFallback: "configured-default"`
+- requires explicit `defaultUserId`
+
+Use `configured-default` only when your channel/workflow architecture guarantees safe tenant/user partitioning around that fallback identity.
+
+## Token and Environment Mapping
+
+`apiKey: "${INFINIMIND_API_KEY}"` in OpenClaw config is resolved from OpenClaw process environment.
+
+The following values must match exactly:
+
+1. InfiniMind service `INFINIMIND_API_KEY`
+2. OpenClaw process env `INFINIMIND_API_KEY`
+3. Bridge resolved `config.apiKey`
+
+Mismatch outcome:
+
+- bridge API calls fail with `401`
 
 Key helper script:
 
@@ -77,26 +165,41 @@ Key helper script:
 python3 scripts/generate_api_keys.py --write-env
 ```
 
-## Validation and restart behavior
+## Recommended Setup Sequence
 
-- OpenClaw uses strict validation for plugin ids, slots, and config schema.
-- `openclaw.plugin.json` must remain strict (`additionalProperties: false`).
-- For plugin infrastructure changes, restart the OpenClaw gateway to avoid stale plugin state.
+1. Start InfiniMind service and verify:
 
-## Verification checklist
+```bash
+curl -s http://127.0.0.1:8080/v1/health
+curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
+```
 
-1. `openclaw plugins list` includes `infinimind-bridge`.
-2. `openclaw plugins doctor` returns no plugin schema errors.
-3. `openclaw plugins info infinimind-bridge` shows enabled status.
-4. Manual tool invocation confirms:
-   - `memory_store` writes return `action: created|duplicate`.
-   - `memory_recall` returns structured memory details.
-   - `memory_forget` returns `deleted|candidates|not_found|missing_param`.
-   - `memory_search` returns the same recall payload shape through the alias path.
+2. Configure OpenClaw plugin path and entry.
+3. Set memory slot to `infinimind-bridge`.
+4. Restart OpenClaw gateway after plugin/config changes.
+5. Run plugin validation commands.
 
-## Profile-isolated automation
+## Validation Commands
 
-Use the E2E script to validate plugin loading and slot wiring without touching your default OpenClaw profile:
+### Manual validation
+
+```bash
+openclaw plugins list
+openclaw plugins doctor
+openclaw plugins info infinimind-bridge
+openclaw config get plugins.slots.memory
+```
+
+Expected:
+
+- plugin appears in `plugins list`
+- `plugins doctor` has no blocking plugin errors
+- plugin info shows `id: infinimind-bridge`
+- slot value resolves to `infinimind-bridge`
+
+### Profile-isolated validation (recommended)
+
+Use the script to avoid modifying your default OpenClaw profile:
 
 ```bash
 scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
@@ -104,29 +207,126 @@ scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
 
 Useful flags:
 
-- `--base-url http://127.0.0.1:8080`
-- `--plugin-path /absolute/path/to/plugins/infinimind-openclaw-bridge`
-- `--openclaw-bin /absolute/path/to/openclaw`
-- `--skip-compose` (when service is already running)
-- `--keep-stack` (for manual post-check inspection)
+```bash
+scripts/openclaw_bridge_e2e.sh \
+  --profile infinimind-ci \
+  --base-url http://127.0.0.1:8080 \
+  --plugin-path /absolute/path/to/plugins/infinimind-openclaw-bridge \
+  --openclaw-bin /absolute/path/to/openclaw \
+  --skip-compose
+```
 
-The script asserts all of the following:
+Script assertions:
 
-1. Bridge plugin is discoverable in `plugins list`.
-2. `plugins doctor` runs cleanly for loaded plugin schema.
-3. `plugins info infinimind-bridge` reports expected plugin id.
-4. `plugins.slots.memory` resolves to `infinimind-bridge`.
+1. bridge plugin discovery in `plugins list`
+2. plugin/config validation via `plugins doctor`
+3. plugin identity via `plugins info infinimind-bridge`
+4. slot ownership via `config get plugins.slots.memory`
 
-## Troubleshooting plugin load and slot validation
+## Tool Behavior Mapping
 
-1. Plugin missing from `plugins list`:
-   - Check `plugins.load.paths` points to the bridge plugin directory.
-   - Confirm bridge dependencies are installed: `cd plugins/infinimind-openclaw-bridge && npm ci --no-audit --no-fund`.
-2. `plugins doctor` reports config/manifest issues:
-   - Validate OpenClaw entry id matches manifest plugin id: `infinimind-bridge`.
-   - Ensure bridge config keys match schema exactly (strict `additionalProperties: false` behavior).
-3. Memory slot is not bound:
-   - Confirm `plugins.slots.memory` is exactly `"infinimind-bridge"`.
-   - Validate with `openclaw --profile infinimind-ci config get plugins.slots.memory`.
-4. Calls return `401`:
-   - Verify the same `INFINIMIND_API_KEY` value is used by service env, OpenClaw process env, and bridge `config.apiKey`.
+### `memory_store`
+
+- forwards create/dedupe-compatible store payload
+- preserves legacy compatibility while allowing additive fields
+
+### `memory_recall`
+
+- full recall path with advanced filter options
+- supports hybrid/off rerank modes
+
+### `memory_search` alias
+
+- mapped to recall endpoint
+- intentionally narrower caller surface than advanced recall
+
+### `memory_forget`
+
+- supports direct delete by `memory_id`
+- supports query-based candidate resolution
+
+## CI and Release Gate Mapping
+
+Integration checks are covered by:
+
+- `openclaw-contract` job
+- `openclaw-e2e` job
+
+Local parity command:
+
+```bash
+scripts/release_gates.sh --check openclaw-contract --check openclaw-e2e
+```
+
+## Troubleshooting
+
+### Plugin not discovered
+
+Symptoms:
+
+- `openclaw plugins list` does not include `infinimind-bridge`
+
+Checks:
+
+1. verify `plugins.load.paths` path exists
+2. verify plugin package dependencies installed (`npm ci`)
+3. verify `plugins.allow` includes `infinimind-bridge`
+
+### Slot not bound to bridge
+
+Symptoms:
+
+- memory tools route to another plugin
+
+Checks:
+
+1. verify `plugins.slots.memory` value exactly equals `infinimind-bridge`
+2. run `openclaw config get plugins.slots.memory`
+3. restart OpenClaw after config changes
+
+### `401` responses from bridge calls
+
+Checks:
+
+1. verify service token (`INFINIMIND_API_KEY`)
+2. verify OpenClaw process env token
+3. verify bridge config `apiKey` interpolation key
+
+### Config validation failure
+
+Common causes:
+
+- unknown keys in bridge config
+- invalid enum values (`defaultScope`, `rerankDefault`, `fallbackMode`, `identityFallback`)
+- missing `defaultUserId` when `identityFallback=configured-default`
+
+### Non-blocking plugin id hint warning
+
+You may see warning text similar to:
+
+- manifest uses `infinimind-bridge`
+- entry hints `openclaw-bridge`
+
+If `plugins info infinimind-bridge` and slot checks pass, integration remains functional. Keep plugin id references consistent (`infinimind-bridge`) in all config paths.
+
+## Security and Operational Notes
+
+- Keep `identityFallback: "error"` unless you have explicit fallback isolation design.
+- Keep bridge config strict and free of unknown keys.
+- Avoid printing raw tokens in scripts/logs.
+- Use profile-isolated checks in CI and local automation to avoid mutating user default OpenClaw state.
+
+## OpenClaw Source References
+
+The integration behavior in this guide aligns with current OpenClaw documentation and plugin strictness expectations:
+
+- [OpenClaw Configuration](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md)
+- [OpenClaw Plugin System](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md)
+- [OpenClaw Plugin Manifest Rules](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md)
+
+## Related Documentation
+
+- [README](../README.md)
+- [Operator Configuration](operators/configuration.md)
+- [Release Checklist](operators/release-checklist.md)
+- [Rollback Guide](operators/rollback.md)

@@ -549,3 +549,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Expand README into a full Docker-first operations guide with explicit token/env mapping, bridge slot/config semantics, CI gate parity, and troubleshooting aligned to OpenClaw strict plugin/config behavior.
 - Impact:
   - New operators can execute setup, validation, rollout, and beta checks end-to-end from a single detailed document.
+
+## 2026-02-24 — Feature: `docs(ops): expand OpenClaw integration and operator configuration guides`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Expand integration and operator docs with detailed config semantics, identity/fallback behavior, strict validation constraints, and profile-isolated gate workflows that mirror current OpenClaw plugin/runtime expectations.
+- Impact:
+  - Operators now have comprehensive integration and day-2 runbooks for rollout, validation, troubleshooting, and beta readiness without OpenClaw core changes.

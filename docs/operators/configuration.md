@@ -1,20 +1,181 @@
 # Operator Configuration Guide
 
-## Docker-first deployment
+This guide is the operations runbook for deploying and running InfiniMind in Docker-first environments with OpenClaw bridge integration.
+
+## Scope
+
+This guide covers:
+
+- environment and key setup
+- Docker deployment and runtime verification
+- OpenClaw bridge rollout configuration
+- local/CI parity quality gates
+- canary rollout and production hardening checks
+- incident troubleshooting for common operator failures
+
+## Deployment Models
+
+### Model A: Local operator validation
+
+- service on host: `http://127.0.0.1:8080`
+- OpenClaw uses local plugin path
+- profile-isolated bridge validation recommended
+
+### Model B: Docker-first sidecar in shared environments
+
+- service runs via compose stack
+- persistent volume mounted for LanceDB data
+- OpenClaw process configured with bridge slot ownership
+
+### Model C: CI validation mode
+
+- mock embeddings by default
+- synthetic keys only
+- automated checks via GitHub workflows and `scripts/release_gates.sh`
+
+## Quick Operator Boot Sequence
 
 From repository root:
 
 ```bash
 cp .env.example .env
 python3 scripts/generate_api_keys.py --write-env
+# Set OPENAI_API_KEY in .env if using openai embeddings
+
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-Default service endpoint: `http://127.0.0.1:8080`
+Verify startup:
 
-## CI/local parity gates
+```bash
+set -a
+source .env
+set +a
 
-Run the same scripted checks that CI uses:
+curl -s http://127.0.0.1:8080/v1/health
+curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
+curl -s http://127.0.0.1:8080/v1/metrics | head
+```
+
+## Environment Variable Matrix
+
+### Core service/auth variables
+
+| Variable | Required | Default | Purpose | Operator notes |
+| --- | --- | --- | --- | --- |
+| `INFINIMIND_API_KEY` | yes | compose fallback for local dev only | primary bearer auth | must match service, curl, and OpenClaw runtime interpolation |
+| `INFINIMIND_ADMIN_API_KEY` | yes for admin endpoint use | compose fallback for local dev only | admin auth for `/v1/admin/reembed` | keep distinct from primary in staging/prod |
+| `OPENAI_API_KEY` | required when provider is `openai` | none | OpenAI embedding auth | generated in OpenAI dashboard |
+
+### Runtime/storage variables
+
+| Variable | Required | Default | Purpose | Operator notes |
+| --- | --- | --- | --- | --- |
+| `INFINIMIND_DATA_DIR` | no | `/var/lib/infinimind` in container | LanceDB storage path | mount persistent volume |
+| `INFINIMIND_EMBEDDING_PROVIDER` | no | `openai` | embedding backend | set `mock` for CI/local deterministic tests |
+| `INFINIMIND_EMBEDDING_MODEL` | no | `text-embedding-3-large` | embedding model ID | keep pinned for migration consistency |
+
+### Observability variables
+
+| Variable | Required | Default | Purpose | Operator notes |
+| --- | --- | --- | --- | --- |
+| `INFINIMIND_TRACING_ENABLED` | no | `false` | tracing switch | when false, tracing path disabled |
+| `INFINIMIND_TRACING_EXPORTER` | no | `otlp` | tracing exporter | `console` and `otlp` supported |
+| `INFINIMIND_TRACING_OTLP_ENDPOINT` | conditional | none | OTLP endpoint | required for `otlp` exporter |
+| `INFINIMIND_TRACING_SERVICE_NAME` | no | `infinimind-service` | trace resource label | use env-specific naming if needed |
+
+## Key Setup and Ownership Mapping
+
+Use helper:
+
+```bash
+python3 scripts/generate_api_keys.py --write-env
+```
+
+Token mapping requirements:
+
+1. service container reads `INFINIMIND_API_KEY`
+2. manual calls use `Authorization: Bearer ${INFINIMIND_API_KEY}`
+3. OpenClaw bridge config uses `apiKey: "${INFINIMIND_API_KEY}"`
+
+If values diverge, bridge calls fail with `401`.
+
+For shell sessions running manual commands:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+OpenAI key source:
+
+- [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+## Docker Runtime Operations
+
+### Start
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+### Stop
+
+```bash
+docker compose -f deploy/docker-compose.yml down
+```
+
+### Stop and remove volume (destructive)
+
+```bash
+docker compose -f deploy/docker-compose.yml down -v
+```
+
+Use `down -v` only when intentionally resetting local data.
+
+### Logs
+
+```bash
+docker logs infinimind-service --tail 200
+```
+
+### Health/ready checks
+
+```bash
+curl -s http://127.0.0.1:8080/v1/health
+curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
+```
+
+## OpenClaw Bridge Rollout Configuration
+
+Primary integration reference:
+
+- [../openclaw-integration.md](../openclaw-integration.md)
+
+Target file:
+
+- `~/.openclaw/openclaw.json`
+
+Required changes:
+
+1. add bridge path under `plugins.load.paths`
+2. add bridge id to `plugins.allow`
+3. set `plugins.slots.memory = "infinimind-bridge"`
+4. configure `plugins.entries.infinimind-bridge.config`
+5. prefer `identityFallback: "error"`
+
+If using `identityFallback: "configured-default"`, you must set `defaultUserId`.
+
+Reference example:
+
+- [../../deploy/openclaw-config.example.json](../../deploy/openclaw-config.example.json)
+
+## Validation Workflows
+
+### Local/CI parity gates
+
+Run same scripted checks used by CI:
 
 ```bash
 scripts/release_gates.sh
@@ -25,101 +186,144 @@ scripts/release_gates.sh --check openclaw-e2e
 
 Notes:
 
-1. `docker-smoke` is designed for synthetic keys by default and blocks real-looking provider secrets.
-2. If you intentionally need live credentials for smoke testing, set `INFINIMIND_ALLOW_REAL_KEYS=1`.
-3. `openclaw-e2e` runs with an isolated profile (`infinimind-ci`) so your default OpenClaw profile is not modified.
+- `docker-smoke` blocks real-looking external secrets by default.
+- if intentional live-key smoke testing is required, set `INFINIMIND_ALLOW_REAL_KEYS=1`.
+- `openclaw-e2e` uses isolated profile and should not mutate default OpenClaw profile state.
 
-## Environment variables
-
-Main variables used by the service container:
-
-- `INFINIMIND_API_KEY`: bearer token for bridge/service calls
-- `INFINIMIND_ADMIN_API_KEY`: admin token for `/v1/admin/reembed`
-- `INFINIMIND_DATA_DIR`: persistent state path (default `/var/lib/infinimind`)
-- `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
-- `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
-- `INFINIMIND_OPENAI_API_KEY`: required for OpenAI embeddings
-- `INFINIMIND_TRACING_ENABLED`: `true`/`false` (default `false`)
-- `INFINIMIND_TRACING_EXPORTER`: `otlp` or `console` (default `otlp`)
-- `INFINIMIND_TRACING_OTLP_ENDPOINT`: required when tracing enabled with `otlp`
-- `INFINIMIND_TRACING_SERVICE_NAME`: span service name (default `infinimind-service`)
-
-## Key setup (no ambiguity)
-
-`INFINIMIND_API_KEY` is the main bearer token.
-
-You set it in `.env` (or shell env), and the same value must be used by:
-
-1. Service container (`INFINIMIND_API_KEY`)
-2. Curl/manual calls (`Authorization: Bearer <value>`)
-3. OpenClaw bridge config (`plugins.entries.infinimind-bridge.config.apiKey`)
-
-If any of those values differ, requests fail with `401`.
-
-`INFINIMIND_ADMIN_API_KEY` is only for admin endpoint `/v1/admin/reembed`.
-
-For manual shell calls (`curl`), load `.env` into the active shell:
+### Manual OpenClaw checks
 
 ```bash
-set -a
-source .env
-set +a
+openclaw --profile infinimind-ci plugins list
+openclaw --profile infinimind-ci plugins doctor
+openclaw --profile infinimind-ci plugins info infinimind-bridge
+openclaw --profile infinimind-ci config get plugins.slots.memory
 ```
 
-OpenClaw resolves `${INFINIMIND_API_KEY}` from the environment of the process that starts OpenClaw.
-
-Recommended key generation command:
-
-```bash
-python3 scripts/generate_api_keys.py --write-env
-```
-
-`OPENAI_API_KEY` must be created in OpenAI dashboard:
-
-- https://platform.openai.com/api-keys
-
-## OpenClaw configuration file changes
-
-Target file: `~/.openclaw/openclaw.json`.
-
-1. Add plugin path under `plugins.load.paths`.
-2. Add plugin id to `plugins.allow`.
-3. Set `plugins.slots.memory = "infinimind-bridge"`.
-4. Configure `plugins.entries.infinimind-bridge.config`.
-5. Set `identityFallback: "error"` (recommended). If you use `"configured-default"`, set `defaultUserId`.
-
-Reference JSON example: [openclaw-config.example.json](../../deploy/openclaw-config.example.json)
-
-Profile-isolated validation command:
+### Bridge E2E script
 
 ```bash
 scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
 ```
 
-## Canary rollout steps
+## Operational Verification Matrix
 
-1. Start sidecar with production-equivalent settings.
-2. Enable bridge plugin for one canary agent/user context.
-3. Keep fallback enabled (`fallbackMode: legacy-compatible`).
-4. Monitor:
-   - `/v1/metrics`
-   - recall fallback counter
-   - policy note counter
-   - p95 latency trend
-5. Expand canary cohort only when safety counters remain stable.
+### API/function checks
 
-## Operational checks
+- `GET /v1/health` returns `status=ok`
+- `GET /v1/ready` (auth) returns `status=ready`
+- `GET /v1/metrics` returns Prometheus payload
+- `POST /v1/memory/store` creates/dedupes as expected
+- `POST /v1/memory/recall` returns scoped/policy-compliant memories
+- `POST /v1/memory/forget` supports delete and candidate flows
+- `POST /v1/admin/reembed` dry-run and empty-store behavior verified
 
-- Liveness: `GET /v1/health`
-- Readiness (auth): `GET /v1/ready`
-- Metrics: `GET /v1/metrics`
-- OpenClaw tool compatibility: `memory_store`, `memory_recall`, `memory_forget`, and `memory_search` alias
-- Forget workflow: `POST /v1/memory/forget` with `query` then delete via `memory_id`
-- Dry-run migration: `POST /v1/admin/reembed` with `dry_run=true`
-- Migration completeness: confirm `memories_v3` row count matches legacy `memories_v2` before cutover
+### Migration checks
 
-If plugin checks fail, use:
+- `memories_v2` retained (non-destructive)
+- `memories_v3` exists and is active
+- row-count integrity holds when migration path is exercised
 
-1. `openclaw --profile infinimind-ci plugins list`
-2. `openclaw --profile infinimind-ci plugins doctor`
-3. `openclaw --profile infinimind-ci config get plugins.slots.memory`
+### OpenClaw checks
+
+- plugin discovered: `infinimind-bridge`
+- memory slot bound to bridge
+- identity fallback mode explicitly configured
+- tool compatibility present: `memory_store`, `memory_recall`, `memory_forget`, `memory_search`
+
+## Canary Rollout Steps
+
+1. deploy sidecar with production-equivalent settings
+2. enable bridge for limited tenant/user/agent cohort
+3. keep `fallbackMode: "legacy-compatible"` in initial canary
+4. monitor metrics and latency
+5. expand cohort only after stable safety/latency windows
+
+Monitor minimum metrics:
+
+- `infinimind_http_requests_total`
+- `infinimind_http_request_latency_seconds`
+- `infinimind_recall_fallback_total`
+- `infinimind_policy_note_total`
+- `infinimind_store_results_total`
+
+## Incident Troubleshooting
+
+### `401` authentication failures
+
+Checks:
+
+1. validate service `INFINIMIND_API_KEY`
+2. validate OpenClaw process env interpolation source
+3. validate bridge `config.apiKey` value resolution
+
+### Docker daemon unavailable
+
+Symptom:
+
+- `Cannot connect to the Docker daemon ...`
+
+Actions:
+
+1. start Docker daemon/Desktop
+2. run `docker ps`
+3. rerun docker smoke gate
+
+### Port 8080 already in use
+
+Symptom:
+
+- bind failure for `127.0.0.1:8080`
+
+Actions:
+
+1. stop conflicting process/container
+2. or run bridge E2E with `--skip-compose` against alternate service port
+3. rely on hosted CI docker-smoke for clean isolated validation
+
+### Bridge not loaded
+
+Actions:
+
+1. verify plugin path exists
+2. run `npm ci` in bridge directory
+3. verify `allow` list and entry id use `infinimind-bridge`
+
+### Slot misrouted
+
+Actions:
+
+1. verify `plugins.slots.memory` setting
+2. rerun `openclaw plugins doctor`
+3. restart OpenClaw after config updates
+
+### Non-blocking plugin id hint warning
+
+A warning about entry hint `openclaw-bridge` vs manifest `infinimind-bridge` can appear. Treat as advisory if `plugins info infinimind-bridge` and slot checks pass.
+
+## Security Hardening Defaults
+
+- use long random secrets for API/admin keys
+- avoid printing raw tokens in automation logs
+- keep bridge config strict (no unknown keys)
+- keep `identityFallback: "error"` unless explicitly justified
+- run `scripts/secret_scan.sh` before release
+
+## Release Gate and Merge Guidance
+
+Use full release checklist:
+
+- [release-checklist.md](release-checklist.md)
+
+Before merge:
+
+1. local gate parity complete
+2. hosted checks green
+3. canary owner and rollback owner identified
+4. rollback plan validated
+
+## Related Documentation
+
+- [README](../../README.md)
+- [OpenClaw Integration](../openclaw-integration.md)
+- [Release Checklist](release-checklist.md)
+- [Rollback Guide](rollback.md)
