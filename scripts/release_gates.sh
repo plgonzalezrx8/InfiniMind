@@ -21,7 +21,15 @@ USAGE
 }
 
 run_service_tests() {
-  python3 -m pytest services/infinimind-service/tests -q
+  local coverage_json="/tmp/infinimind-service-coverage.json"
+  python3 -m pytest \
+    services/infinimind-service/tests \
+    --cov=services/infinimind-service/app \
+    --cov-report=term-missing \
+    --cov-report="json:${coverage_json}" \
+    --cov-fail-under=85 \
+    -q
+  python3 "${ROOT_DIR}/scripts/check_service_coverage.py" --coverage-json "${coverage_json}" --min-overall 85
 }
 
 run_bridge_quality() {

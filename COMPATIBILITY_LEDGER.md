@@ -571,3 +571,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep beta launch criteria tied to strict plugin/config validation, memory-slot ownership correctness, and explicit memory tool compatibility against a pinned OpenClaw version.
 - Impact:
   - Iteration-5 implementation now has a concrete, auditable gate matrix and baseline evidence snapshot before any behavior-changing work.
+
+## 2026-02-24 — Feature: `test(service): raise critical-path coverage and add module thresholds`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Enforce service coverage gates in automation (overall + critical-module floors) while expanding unit coverage for auth/dependencies/policy/embeddings/storage compatibility paths.
+- Impact:
+  - Beta quality gates now block regressions in high-risk service internals instead of relying on aggregate test counts alone.

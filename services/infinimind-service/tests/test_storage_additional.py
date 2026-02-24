@@ -1,0 +1,214 @@
+"""Additional storage coverage for compatibility helpers and in-memory paths."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from app.memory_schema import MemoryRecord
+from app.storage import LanceMemoryStore
+
+
+class _DictPayload:
+    """Simple dataframe-like payload with `to_dict` support."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def to_dict(self, orient=None):
+        if orient == "records":
+            return self._rows
+        return {"records": self._rows}
+
+
+class _ArrowPayload:
+    """Arrow-like payload exposing `to_pylist` used by storage converters."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def to_pylist(self):
+        return self._rows
+
+
+class _QueryToArrow:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def to_arrow(self):
+        return _ArrowPayload(self._rows)
+
+
+class _SearchOnlyTable:
+    """Table with search-only scan support to exercise fallback paths."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.deleted = None
+
+    def search(self, *_args, **_kwargs):
+        return _QueryWithLimit(self._rows)
+
+    def delete(self, expression: str):
+        self.deleted = expression
+
+
+class _QueryWithLimit:
+    def __init__(self, rows):
+        self._rows = rows
+        self._limit = len(rows)
+
+    def limit(self, limit):
+        self._limit = limit
+        return self
+
+    def to_list(self):
+        return self._rows[: self._limit]
+
+
+class _VectorTable:
+    def __init__(self, rows):
+        self._rows = rows
+        self.added = []
+
+    def search(self, _query_vector):
+        return _QueryWithLimit(self._rows)
+
+    def add(self, rows):
+        self.added.extend(rows)
+
+    def delete(self, expression):
+        # Keep tests deterministic without parsing expression semantics.
+        self._rows = [row for row in self._rows if "memory_id = " not in expression or row.get("memory_id") not in expression]
+
+
+class _DbRecorder:
+    def __init__(self):
+        self.created = {}
+
+    def create_table(self, name, data):
+        self.created[name] = list(data)
+
+
+def _memory_record(**overrides):
+    now = datetime.now(UTC).isoformat()
+    payload = {
+        "tenant_id": "default",
+        "user_id": "user-1",
+        "agent_id": "main",
+        "text": "remember this",
+        "category": "fact",
+        "importance": 0.7,
+        "scope": "user",
+        "sensitivity": "low",
+        "created_at": now,
+        "updated_at": now,
+        "ttl_expires_at": None,
+        "embedding_model_id": "text-embedding-3-large",
+        "content_hash": "hash-1",
+        "vector": [0.1, 0.2, 0.3, 0.4],
+        "tags": ["ops"],
+        "metadata": {"source": "test"},
+    }
+    payload.update(overrides)
+    return MemoryRecord(**payload)
+
+
+def test_payload_and_query_conversion_helpers(tmp_path):
+    """Storage helper conversions should handle list/arrow/dataframe variants."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    rows = [{"memory_id": "m1"}]
+
+    assert store._payload_to_rows(None) == []
+    assert store._payload_to_rows(rows) == rows
+    assert store._payload_to_rows(_ArrowPayload(rows)) == rows
+    assert store._payload_to_rows(_DictPayload(rows)) == rows
+    assert store._query_results_to_rows(_QueryToArrow(rows)) == rows
+
+
+def test_table_scan_falls_back_to_search_and_scoped_delete_escapes_quotes(tmp_path):
+    """Fallback table scan and scoped deletion should remain compatible and safe."""
+
+    rows = [
+        {"memory_id": "quoted'id", "tenant_id": "default", "user_id": "user-1", "agent_id": "main"},
+        {"memory_id": "m2", "tenant_id": "default", "user_id": "other", "agent_id": "main"},
+    ]
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store._table = _SearchOnlyTable(rows)
+    scanned = store.list_memories(limit=1)
+    assert scanned[0]["memory_id"] == "quoted'id"
+
+    deleted = store.delete_memory(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        memory_id="quoted'id",
+    )
+    assert deleted is True
+    # Verify single-quote escaping in generated filter expression.
+    assert "quoted''id" in store._table.deleted
+
+
+def test_in_memory_store_vector_search_shadow_and_scoped_helpers(tmp_path):
+    """In-memory mode should support core CRUD/search/shadow helper paths."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store._in_memory_mode = True
+    one = store.store_memory(_memory_record(memory_id="m1", vector=[1.0, 0.0, 0.0, 0.0]))
+    two = store.store_memory(_memory_record(memory_id="m2", vector=[0.0, 1.0, 0.0, 0.0], user_id="user-2"))
+    assert one.memory_id == "m1"
+    assert two.memory_id == "m2"
+
+    all_rows = store.list_all_memories()
+    assert len(all_rows) == 2
+    assert store.find_duplicate(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        content_hash="hash-1",
+        dedupe_key=None,
+    )
+
+    scoped = store.scoped_memories(tenant_id="default", user_id="user-1", agent_id="main", limit=None)
+    assert [row["memory_id"] for row in scoped] == ["m1"]
+    assert store.find_scoped_memory_by_id(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        memory_id="m1",
+    )
+    assert store.delete_memory(tenant_id="default", user_id="user-1", agent_id="main", memory_id="m1") is True
+    assert store.delete_memory(tenant_id="default", user_id="user-1", agent_id="main", memory_id="missing") is False
+
+    ranked = store.vector_search([0.0, 1.0, 0.0, 0.0], limit=1)
+    assert len(ranked) == 1
+    assert ranked[0]["memory_id"] == "m2"
+
+    shadow_name = store.write_shadow_embeddings(
+        target_model_id="text-embedding-3-small",
+        rows=store.list_all_memories(),
+        vectors=[[0.9, 0.8, 0.7, 0.6]],
+    )
+    assert shadow_name is not None
+    assert shadow_name in store._shadow_tables
+    assert store.write_shadow_embeddings(target_model_id="text-embedding-3-small", rows=[], vectors=[]) is None
+
+
+def test_vector_and_shadow_paths_for_db_mode(tmp_path):
+    """DB mode should route vector search and shadow writes through table/db adapters."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    table = _VectorTable([{"memory_id": "db-1"}])
+    store._table = table
+    store._db = _DbRecorder()
+
+    ranked = store.vector_search([0.1, 0.2, 0.3, 0.4], limit=1)
+    assert ranked[0]["memory_id"] == "db-1"
+
+    shadow = store.write_shadow_embeddings(
+        target_model_id="text-embedding-3-small",
+        rows=[{"memory_id": "db-1", "embedding_model_id": "text-embedding-3-large"}],
+        vectors=[[0.5, 0.6, 0.7, 0.8]],
+    )
+    assert shadow is not None
+    assert shadow in store._db.created
