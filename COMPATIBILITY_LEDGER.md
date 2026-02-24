@@ -510,3 +510,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Centralize release checks in reusable scripts (`release_gates`, `docker_smoke`, `secret_scan`) and run those scripts from CI workflows to preserve strict plugin/config contracts and profile-safe integration behavior.
 - Impact:
   - CI and local release verification now execute the same gate commands, reducing manual drift and making failures reproducible.
+
+## 2026-02-24 — Feature: `docs(ops): align README/operator docs with automated gates`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Document CI/local parity through shared gate scripts, enforce profile-isolated OpenClaw checks, and make required hosted check names explicit for merge protection.
+- Impact:
+  - Operators now have copy-paste-safe instructions that match executable automation and reduce plugin/slot misconfiguration drift.

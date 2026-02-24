@@ -93,3 +93,40 @@ python3 scripts/generate_api_keys.py --write-env
    - `memory_recall` returns structured memory details.
    - `memory_forget` returns `deleted|candidates|not_found|missing_param`.
    - `memory_search` returns the same recall payload shape through the alias path.
+
+## Profile-isolated automation
+
+Use the E2E script to validate plugin loading and slot wiring without touching your default OpenClaw profile:
+
+```bash
+scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
+```
+
+Useful flags:
+
+- `--base-url http://127.0.0.1:8080`
+- `--plugin-path /absolute/path/to/plugins/infinimind-openclaw-bridge`
+- `--openclaw-bin /absolute/path/to/openclaw`
+- `--skip-compose` (when service is already running)
+- `--keep-stack` (for manual post-check inspection)
+
+The script asserts all of the following:
+
+1. Bridge plugin is discoverable in `plugins list`.
+2. `plugins doctor` runs cleanly for loaded plugin schema.
+3. `plugins info infinimind-bridge` reports expected plugin id.
+4. `plugins.slots.memory` resolves to `infinimind-bridge`.
+
+## Troubleshooting plugin load and slot validation
+
+1. Plugin missing from `plugins list`:
+   - Check `plugins.load.paths` points to the bridge plugin directory.
+   - Confirm bridge dependencies are installed: `cd plugins/infinimind-openclaw-bridge && npm ci --no-audit --no-fund`.
+2. `plugins doctor` reports config/manifest issues:
+   - Validate OpenClaw entry id matches manifest plugin id: `infinimind-bridge`.
+   - Ensure bridge config keys match schema exactly (strict `additionalProperties: false` behavior).
+3. Memory slot is not bound:
+   - Confirm `plugins.slots.memory` is exactly `"infinimind-bridge"`.
+   - Validate with `openclaw --profile infinimind-ci config get plugins.slots.memory`.
+4. Calls return `401`:
+   - Verify the same `INFINIMIND_API_KEY` value is used by service env, OpenClaw process env, and bridge `config.apiKey`.

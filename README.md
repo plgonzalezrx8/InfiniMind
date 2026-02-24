@@ -265,6 +265,12 @@ openclaw plugins list
 openclaw plugins info infinimind-bridge
 ```
 
+For profile-isolated bridge validation (recommended for local checks and CI parity):
+
+```bash
+scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
+```
+
 Tool compatibility notes:
 
 - Legacy tools remain available: `memory_store`, `memory_recall`, `memory_forget`
@@ -276,18 +282,31 @@ Full guidance:
 - [OpenClaw Integration](docs/openclaw-integration.md)
 - [Operator Configuration](docs/operators/configuration.md)
 
-## Testing
+## Testing and quality gates
 
-Run service tests:
+Run the default release gate set (service tests, bridge checks, OpenClaw contract tests, secret scan):
 
 ```bash
-python3 -m pytest services/infinimind-service/tests -q
+scripts/release_gates.sh
 ```
 
-Run OpenClaw contract tests:
+Run Docker-first smoke validation:
 
 ```bash
-python3 -m pytest tests/openclaw -q
+OPENAI_API_KEY="" scripts/release_gates.sh --check docker-smoke
+```
+
+Run OpenClaw bridge E2E validation with isolated profile:
+
+```bash
+OPENCLAW_BIN="$(pwd)/plugins/infinimind-openclaw-bridge/node_modules/.bin/openclaw" \
+scripts/release_gates.sh --check openclaw-e2e
+```
+
+If your shell exports a real provider key and you intentionally want to use it in smoke tests, opt in explicitly:
+
+```bash
+INFINIMIND_ALLOW_REAL_KEYS=1 scripts/release_gates.sh --check docker-smoke
 ```
 
 ## Benchmarking
@@ -318,7 +337,16 @@ InfiniMind now reads/writes `memories_v3`.
 
 ## Release and merge
 
-Use:
+Required hosted checks:
+
+- `service-tests`
+- `bridge-quality`
+- `openclaw-contract`
+- `secret-scan`
+- `docker-smoke`
+- `openclaw-e2e`
+
+Use the release runbook:
 
 - [Release Checklist](docs/operators/release-checklist.md)
 

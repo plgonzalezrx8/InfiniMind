@@ -7,57 +7,77 @@ Use this checklist before merging `codex/infinimind-mvp` into `main`.
 - Confirm linear feature commit history (`git log --oneline`).
 - Confirm each feature commit has a compatibility ledger entry.
 
-## 2. Service verification
+## 2. Automated gate run (local parity with CI)
 
-- Build and run sidecar:
-  - `docker compose -f deploy/docker-compose.yml up -d --build`
-- Verify endpoints:
-  - `GET /v1/health`
-  - `GET /v1/ready` (with bearer token)
-  - `GET /v1/metrics`
-- Verify core APIs:
+Run default release checks:
+
+```bash
+scripts/release_gates.sh
+```
+
+Run Docker-first smoke checks with synthetic keys:
+
+```bash
+OPENAI_API_KEY="" scripts/release_gates.sh --check docker-smoke
+```
+
+Run OpenClaw bridge E2E checks with an isolated profile:
+
+```bash
+OPENCLAW_BIN="$(pwd)/plugins/infinimind-openclaw-bridge/node_modules/.bin/openclaw" \
+scripts/release_gates.sh --check openclaw-e2e
+```
+
+## 3. Required hosted checks
+
+Confirm all required GitHub checks are green:
+
+- `service-tests`
+- `bridge-quality`
+- `openclaw-contract`
+- `secret-scan`
+- `docker-smoke`
+- `openclaw-e2e`
+
+## 4. Service and migration verification
+
+- Verify core APIs in smoke/manual checks:
   - `POST /v1/memory/store`
   - `POST /v1/memory/recall`
   - `POST /v1/memory/forget`
-  - `POST /v1/admin/reembed` dry-run
-  - `POST /v1/admin/reembed` on empty dataset returns `processed=0`
 - Verify metadata persistence:
   - Store with `metadata` and confirm recall returns the same `metadata` payload.
+- Verify re-embed behavior:
+  - `POST /v1/admin/reembed` dry-run works.
+  - empty dataset returns `processed=0`.
 - Verify migration bootstrap:
   - Existing `memories_v2` data is promoted to `memories_v3` without deleting legacy table.
 
-## 3. OpenClaw integration verification
+## 5. OpenClaw integration verification
 
-- Validate manifest contract tests:
-  - `python3 -m pytest tests/openclaw -q`
-- Validate bridge package checks:
-  - `npm install --no-audit --no-fund` (inside `plugins/infinimind-openclaw-bridge`)
-  - `npm run typecheck` (inside `plugins/infinimind-openclaw-bridge`)
-  - `npm run test` (inside `plugins/infinimind-openclaw-bridge`)
-- Verify tool compatibility exposure:
-  - `memory_store`, `memory_recall`, `memory_forget`
-  - `memory_search` alias mapped to recall behavior
 - Ensure OpenClaw config references only discoverable plugin ids.
-- Run `openclaw plugins doctor` after enabling `infinimind-bridge`.
 - Ensure bridge config uses `identityFallback: "error"` unless a deliberate `defaultUserId` is configured.
+- Verify plugin and slot state in isolated profile:
+  - `openclaw --profile infinimind-ci plugins list`
+  - `openclaw --profile infinimind-ci plugins doctor`
+  - `openclaw --profile infinimind-ci config get plugins.slots.memory`
 
-## 4. Safety checks
+## 6. Safety checks
 
 - Validate sensitivity gating behavior (`include_sensitive` + `trust_level`).
 - Validate fallback does not bypass user/tenant constraints.
 - Confirm no destructive migration steps are required (`memories_v2` retained during v3 bootstrap).
-- Run secret scan:
-  - `rg -l "sk-[A-Za-z0-9_-]{20,}"`
-  - `rg -l "(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-)"`
+- Run secret scan gate:
+  - `scripts/release_gates.sh --check secret-scan`
 - Optional tracing verification (if enabled):
   - Set tracing env vars and confirm request spans are exported.
 
-## 5. Rollback readiness
+## 7. Rollback readiness
 
 - Confirm rollback steps in [rollback.md](rollback.md).
 - Confirm fallback memory slot target (`memory-core`) is available.
 
-## 6. Merge readiness
+## 8. Merge readiness
 
 - Open PR from `codex/infinimind-mvp` to `main`.
 - Include benchmark output from `scripts/benchmark_recall.py`.

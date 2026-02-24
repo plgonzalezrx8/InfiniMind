@@ -12,6 +12,23 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 Default service endpoint: `http://127.0.0.1:8080`
 
+## CI/local parity gates
+
+Run the same scripted checks that CI uses:
+
+```bash
+scripts/release_gates.sh
+OPENAI_API_KEY="" scripts/release_gates.sh --check docker-smoke
+OPENCLAW_BIN="$(pwd)/plugins/infinimind-openclaw-bridge/node_modules/.bin/openclaw" \
+scripts/release_gates.sh --check openclaw-e2e
+```
+
+Notes:
+
+1. `docker-smoke` is designed for synthetic keys by default and blocks real-looking provider secrets.
+2. If you intentionally need live credentials for smoke testing, set `INFINIMIND_ALLOW_REAL_KEYS=1`.
+3. `openclaw-e2e` runs with an isolated profile (`infinimind-ci`) so your default OpenClaw profile is not modified.
+
 ## Environment variables
 
 Main variables used by the service container:
@@ -73,6 +90,12 @@ Target file: `~/.openclaw/openclaw.json`.
 
 Reference JSON example: [openclaw-config.example.json](../../deploy/openclaw-config.example.json)
 
+Profile-isolated validation command:
+
+```bash
+scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
+```
+
 ## Canary rollout steps
 
 1. Start sidecar with production-equivalent settings.
@@ -94,3 +117,9 @@ Reference JSON example: [openclaw-config.example.json](../../deploy/openclaw-con
 - Forget workflow: `POST /v1/memory/forget` with `query` then delete via `memory_id`
 - Dry-run migration: `POST /v1/admin/reembed` with `dry_run=true`
 - Migration completeness: confirm `memories_v3` row count matches legacy `memories_v2` before cutover
+
+If plugin checks fail, use:
+
+1. `openclaw --profile infinimind-ci plugins list`
+2. `openclaw --profile infinimind-ci plugins doctor`
+3. `openclaw --profile infinimind-ci config get plugins.slots.memory`
