@@ -328,3 +328,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Treat malformed metadata payloads as non-fatal and return empty metadata with memory-id scoped warnings.
 - Impact:
   - Corrupt row metadata no longer causes recall-time failures.
+
+## 2026-02-24 — Feature: `test(bridge): add identity fallback behavior tests`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Add executable bridge tests for identity fallback modes and precedence ordering using mocked HTTP calls.
+- Impact:
+  - Identity isolation logic is now behavior-tested instead of only schema/source-string checked.
