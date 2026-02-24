@@ -454,3 +454,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Re-run full service/openclaw/bridge validation gates, secret scans, and portability checks before release.
 - Impact:
   - Branch is audit-remediation complete with passing automated checks and updated compatibility evidence.
+
+## 2026-02-24 — Feature: `chore(ci): add required GitHub Actions quality gates`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+- Decision:
+  - Add deterministic hosted CI jobs for service tests, bridge quality checks, OpenClaw contract checks, and secret regex scanning.
+- Impact:
+  - Merge gating can be enforced via stable CI job names instead of manual local-only validation.
