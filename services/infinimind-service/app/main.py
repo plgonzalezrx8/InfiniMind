@@ -247,6 +247,7 @@ def _row_to_recall_item(
     memory_id = str(row.get("memory_id") or "unknown")
     tags: list[str]
     try:
+        # Keep list-like fields fail-safe; malformed values should degrade to [].
         parsed_tags = json.loads(row.get("tags_json") or "[]")
         if isinstance(parsed_tags, list):
             tags = [str(tag) for tag in parsed_tags]
@@ -272,6 +273,7 @@ def _row_to_recall_item(
 
     conflict_set: list[str]
     try:
+        # Conflict sets are optional quality hints and must not break recall payloads.
         parsed_conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
         if isinstance(parsed_conflict_set, list):
             conflict_set = [str(item) for item in parsed_conflict_set]

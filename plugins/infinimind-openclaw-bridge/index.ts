@@ -78,6 +78,8 @@ const infinimindBridgePlugin = {
       params: Record<string, unknown>,
       options: { includeAdvancedFilters: boolean },
     ) => {
+      // The alias tool (memory_search) reuses this path but intentionally keeps a
+      // narrower caller surface by disabling advanced filter overrides.
       const resolvedUserId = resolveUserIdFromParams(params, cfg);
       const payload = {
         tenant_id: typeof params.tenantId === "string" ? params.tenantId : "default",

@@ -427,3 +427,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Replace machine-local absolute links with repository-relative paths and document dual tool compatibility (`memory_search` alias + legacy tools).
 - Impact:
   - Documentation is portable across environments and aligned with current bridge behavior.
+
+## 2026-02-24 — Feature: `chore(comments): targeted inline comments/docstrings on non-obvious logic`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Add concise comments on migration integrity checks, fail-safe JSON normalization, and alias-tool recall mapping constraints.
+- Impact:
+  - Complex guardrails remain explicit for maintainers without changing runtime behavior.

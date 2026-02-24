@@ -263,6 +263,7 @@ class LanceMemoryStore:
         expected_source_count: int | None = None
         if callable(count_rows):
             try:
+                # When available, use backend-reported counts to detect partial scans.
                 expected_source_count = int(count_rows())
             except Exception:  # pragma: no cover - backend capability variation
                 expected_source_count = None
