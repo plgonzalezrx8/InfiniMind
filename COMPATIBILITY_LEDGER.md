@@ -473,3 +473,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add a hosted Docker smoke job using mock embeddings and authenticated health/store/recall/forget checks to validate the default operational path.
 - Impact:
   - Docker-first runtime regressions are now caught early in CI before merge.
+
+## 2026-02-24 — Feature: `feat(e2e): make openclaw bridge e2e script executable and isolated`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+- Decision:
+  - Replace the echo-only script with an executable profile-isolated E2E runner that writes scoped config, validates plugin discovery/doctor/info, and fails fast on setup drift.
+- Impact:
+  - OpenClaw bridge integration checks are now runnable in CI/local without touching default user profiles.
