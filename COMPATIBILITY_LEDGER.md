@@ -292,3 +292,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add targeted regression tests for bridge packaging/identity contracts, storage migration, forget flows, date validation, metadata round-trip, and tracing bootstrap.
 - Impact:
   - The audited failure modes now have explicit automated coverage to prevent reintroduction.
+
+## 2026-02-24 — Feature: `chore(release): finalize audit remediation verification and compatibility ledger`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Capture final validation gates and hardening checks in the release checklist for pre-merge enforcement.
+- Impact:
+  - Audit remediation now ships with explicit merge gates for packaging, identity safety, migration behavior, and secret hygiene.
