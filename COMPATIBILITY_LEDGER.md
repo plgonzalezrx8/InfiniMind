@@ -445,3 +445,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Expand bridge/openclaw regression checks for alias behavior and pinned dependency contracts to protect the remediation surface.
 - Impact:
   - Iteration-3 compatibility fixes are now covered by executable tests that catch future drift.
+
+## 2026-02-24 — Feature: `chore(release): final verification + compatibility ledger refresh`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Re-run full service/openclaw/bridge validation gates, secret scans, and portability checks before release.
+- Impact:
+  - Branch is audit-remediation complete with passing automated checks and updated compatibility evidence.
