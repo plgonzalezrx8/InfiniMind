@@ -274,3 +274,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep existing Prometheus metrics and add opt-in tracing behind explicit environment flags.
 - Impact:
   - Operators can enable trace export without changing default runtime behavior.
+
+## 2026-02-24 — Feature: `docs(clarity): make env loading and token usage explicit for docker, shell, and OpenClaw`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Document separate environment contexts (Docker, shell, OpenClaw process) and include identity fallback guidance in config examples.
+- Impact:
+  - Setup and troubleshooting steps are now explicit about where tokens are sourced and how interpolation works.

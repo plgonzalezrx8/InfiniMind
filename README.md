@@ -53,31 +53,40 @@ cp .env.example .env
 python3 scripts/generate_api_keys.py --write-env
 ```
 
-3. Create OpenAI key and set it in `.env`:
+3. Load `.env` into your current shell for manual `curl` commands:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+4. Create OpenAI key and set it in `.env`:
 
 - Open: `https://platform.openai.com/api-keys`
 - Create a new API key
 - Set `OPENAI_API_KEY=...` in `.env`
+- Re-run the shell export snippet above after editing `.env`
 
-4. Start service:
+5. Start service:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-5. Verify liveness:
+6. Verify liveness:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/health
 ```
 
-6. Verify readiness (auth required):
+7. Verify readiness (auth required):
 
 ```bash
 curl -s -H "Authorization: Bearer ${INFINIMIND_API_KEY}" http://127.0.0.1:8080/v1/ready
 ```
 
-7. Verify metrics endpoint:
+8. Verify metrics endpoint:
 
 ```bash
 curl -s http://127.0.0.1:8080/v1/metrics | head
@@ -112,6 +121,17 @@ The same token value must be used in all of these places:
 If these do not match exactly, requests fail with `401`.
 
 `change-me-now` is only a local fallback default from `docker-compose` when no env value is set.
+
+### Three environment contexts (important)
+
+1. Docker Compose context:
+   - Reads `.env` automatically for container env interpolation.
+2. Manual shell context:
+   - `curl` examples use `${INFINIMIND_API_KEY}` from your active shell.
+   - Run `set -a; source .env; set +a` in each shell session.
+3. OpenClaw runtime context:
+   - `apiKey: "${INFINIMIND_API_KEY}"` in `~/.openclaw/openclaw.json` is resolved from the OpenClaw process environment.
+   - Export `INFINIMIND_API_KEY` where OpenClaw is launched.
 
 ### What value should I use?
 
@@ -187,12 +207,13 @@ plugins: {
         apiKey: "${INFINIMIND_API_KEY}",
         timeoutMs: 4000,
         defaultScope: "user",
-        includeSensitiveDefault: false,
-        rerankDefault: "hybrid",
-        fallbackMode: "legacy-compatible"
+          includeSensitiveDefault: false,
+          rerankDefault: "hybrid",
+          fallbackMode: "legacy-compatible",
+          identityFallback: "error"
+        }
       }
     }
-  }
 }
 ```
 

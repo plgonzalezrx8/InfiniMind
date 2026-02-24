@@ -41,7 +41,8 @@ Update `~/.openclaw/openclaw.json`:
           defaultScope: "user",
           includeSensitiveDefault: false,
           rerankDefault: "hybrid",
-          fallbackMode: "legacy-compatible"
+          fallbackMode: "legacy-compatible",
+          identityFallback: "error"
         }
       }
     }
@@ -56,6 +57,13 @@ Important:
 1. Set `INFINIMIND_API_KEY` in the environment where OpenClaw runs.
 2. Set the same value for the InfiniMind service (`INFINIMIND_API_KEY`).
 3. If these differ, bridge calls fail with `401`.
+4. `identityFallback: "error"` is recommended to avoid accidental user-identity collapse.
+
+If you explicitly choose `identityFallback: "configured-default"`, you must also set:
+
+```json5
+defaultUserId: "some-explicit-user-id"
+```
 
 Key helper script:
 

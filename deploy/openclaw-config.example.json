@@ -18,7 +18,8 @@
           "defaultScope": "user",
           "includeSensitiveDefault": false,
           "rerankDefault": "hybrid",
-          "fallbackMode": "legacy-compatible"
+          "fallbackMode": "legacy-compatible",
+          "identityFallback": "error"
         }
       }
     }

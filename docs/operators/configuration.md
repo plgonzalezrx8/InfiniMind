@@ -37,6 +37,16 @@ If any of those values differ, requests fail with `401`.
 
 `INFINIMIND_ADMIN_API_KEY` is only for admin endpoint `/v1/admin/reembed`.
 
+For manual shell calls (`curl`), load `.env` into the active shell:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+OpenClaw resolves `${INFINIMIND_API_KEY}` from the environment of the process that starts OpenClaw.
+
 Recommended key generation command:
 
 ```bash
@@ -55,6 +65,7 @@ Target file: `~/.openclaw/openclaw.json`.
 2. Add plugin id to `plugins.allow`.
 3. Set `plugins.slots.memory = "infinimind-bridge"`.
 4. Configure `plugins.entries.infinimind-bridge.config`.
+5. Set `identityFallback: "error"` (recommended). If you use `"configured-default"`, set `defaultUserId`.
 
 Reference JSON example: [openclaw-config.example.json](/Users/pedrogonzalez/CascadeProjects/InfiniMind/deploy/openclaw-config.example.json)
 
