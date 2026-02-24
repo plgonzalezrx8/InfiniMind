@@ -250,9 +250,11 @@ def _row_to_recall_item(
     try:
         parsed_metadata = json.loads(row.get("metadata_json") or "{}")
         metadata = parsed_metadata if isinstance(parsed_metadata, dict) else {}
+        # Metadata is optional context. Non-object payloads should not fail recall.
         if not isinstance(parsed_metadata, dict):
             LOGGER.warning("Invalid metadata_json type for memory_id=%s; defaulting to empty metadata", memory_id)
     except Exception:
+        # Corrupted legacy rows should degrade gracefully to preserve recall availability.
         LOGGER.warning("Invalid metadata_json for memory_id=%s; defaulting to empty metadata", memory_id)
         metadata = {}
     conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
@@ -394,6 +396,7 @@ def forget(payload: ForgetRequest) -> ForgetResponse:
         if not ranked:
             return ForgetResponse(action="not_found", found=0)
 
+        # Only auto-delete when the intent is unambiguous and confidence is high.
         if len(ranked) == 1 and float(ranked[0]["score"]) > 0.90:
             candidate_id = str(ranked[0]["row"].get("memory_id"))
             deleted = app.state.memory_store.delete_memory(

@@ -44,6 +44,8 @@ function resolveUserIdFromParams(
   params: Record<string, unknown>,
   cfg: { identityFallback: "error" | "configured-default"; defaultUserId: string | null },
 ): string {
+  // Precedence is intentional: explicit user identity should always win over
+  // context-derived identifiers to avoid accidental cross-user collapse.
   const candidates = ["userId", "actorId", "sessionId", "channelId"] as const;
   for (const key of candidates) {
     const value = params[key];
