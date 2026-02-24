@@ -229,3 +229,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add service-side forget semantics aligned with memory-lancedb behavior while enforcing tenant/user/agent boundaries.
 - Impact:
   - Bridge can now support delete and candidate-forget workflows without modifying OpenClaw core.
+
+## 2026-02-24 — Feature: `feat(bridge-tools): add legacy-compatible memory_forget tool mapping`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Register a bridge-side memory_forget tool that mirrors memory-lancedb behavior and calls the external forget endpoint.
+- Impact:
+  - OpenClaw agents can invoke memory_forget through InfiniMind without changing tool naming conventions.

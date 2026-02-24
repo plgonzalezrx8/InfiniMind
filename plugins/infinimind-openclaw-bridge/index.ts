@@ -24,6 +24,20 @@ type RecallResponse = {
   debug?: Record<string, unknown> | null;
 };
 
+type ForgetCandidate = {
+  memory_id: string;
+  text: string;
+  category: string;
+  score: number;
+};
+
+type ForgetResponse = {
+  action: "deleted" | "candidates" | "not_found" | "missing_param";
+  memory_id?: string | null;
+  found?: number | null;
+  candidates?: ForgetCandidate[];
+};
+
 const MEMORY_CATEGORIES = ["preference", "fact", "decision", "entity", "other"] as const;
 
 function resolveUserIdFromParams(
@@ -213,6 +227,75 @@ const infinimindBridgePlugin = {
         },
       },
       { name: "memory_recall" },
+    );
+
+    api.registerTool(
+      {
+        name: "memory_forget",
+        label: "Memory Forget",
+        description: "Delete or disambiguate memories through the external InfiniMind service.",
+        parameters: Type.Object({
+          query: Type.Optional(Type.String({ description: "Search query to find deletion candidates" })),
+          memoryId: Type.Optional(Type.String({ description: "Specific memory ID to delete" })),
+          limit: Type.Optional(Type.Number({ description: "Candidate list size (default: 5)" })),
+          userId: Type.Optional(Type.String()),
+          tenantId: Type.Optional(Type.String()),
+          agentId: Type.Optional(Type.String()),
+          channelId: Type.Optional(Type.String()),
+          sessionId: Type.Optional(Type.String()),
+          actorId: Type.Optional(Type.String()),
+        }),
+        async execute(_toolCallId, params) {
+          const p = params as Record<string, unknown>;
+          const resolvedUserId = resolveUserIdFromParams(p, cfg);
+          const payload = {
+            tenant_id: typeof p.tenantId === "string" ? p.tenantId : "default",
+            user_id: resolvedUserId,
+            agent_id: typeof p.agentId === "string" ? p.agentId : "main",
+            memory_id: typeof p.memoryId === "string" ? p.memoryId : null,
+            query: typeof p.query === "string" ? p.query : null,
+            limit: typeof p.limit === "number" ? p.limit : 5,
+          };
+
+          const result = await client.post<ForgetResponse>("/v1/memory/forget", payload);
+          if (result.action === "deleted") {
+            const deletedId = result.memory_id ?? payload.memory_id ?? "unknown";
+            return {
+              content: [{ type: "text", text: `Memory ${deletedId} forgotten.` }],
+              details: { action: "deleted", id: deletedId },
+            };
+          }
+
+          if (result.action === "not_found") {
+            return {
+              content: [{ type: "text", text: "No matching memories found." }],
+              details: { action: "not_found", found: result.found ?? 0 },
+            };
+          }
+
+          if (result.action === "missing_param") {
+            return {
+              content: [{ type: "text", text: "Provide query or memoryId." }],
+              details: { action: "missing_param" },
+            };
+          }
+
+          const candidates = result.candidates ?? [];
+          const list = candidates
+            .map((candidate) => `- [${candidate.memory_id}] ${candidate.text} (${(candidate.score * 100).toFixed(0)}%)`)
+            .join("\n");
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Found ${result.found ?? candidates.length} candidates. Specify memoryId:\n${list}`,
+              },
+            ],
+            details: { action: "candidates", candidates },
+          };
+        },
+      },
+      { name: "memory_forget" },
     );
 
     api.registerService({
