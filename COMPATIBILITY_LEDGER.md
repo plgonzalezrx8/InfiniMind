@@ -559,3 +559,15 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Expand integration and operator docs with detailed config semantics, identity/fallback behavior, strict validation constraints, and profile-isolated gate workflows that mirror current OpenClaw plugin/runtime expectations.
 - Impact:
   - Operators now have comprehensive integration and day-2 runbooks for rollout, validation, troubleshooting, and beta readiness without OpenClaw core changes.
+
+## 2026-02-24 — Feature: `chore(audit): baseline beta gate matrix and evidence snapshot`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/memory.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Keep beta launch criteria tied to strict plugin/config validation, memory-slot ownership correctness, and explicit memory tool compatibility against a pinned OpenClaw version.
+- Impact:
+  - Iteration-5 implementation now has a concrete, auditable gate matrix and baseline evidence snapshot before any behavior-changing work.
