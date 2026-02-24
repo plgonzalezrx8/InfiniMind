@@ -193,6 +193,61 @@ class LanceMemoryStore:
 
         return []
 
+    def _iter_table_rows(self, table: Any, *, batch_size: int) -> Any:
+        """Yield table rows in batches using the most stable available scan path.
+
+        We prefer scanner/batch APIs to avoid materializing large tables in memory
+        during migration. If batch APIs are unavailable, we degrade to a full scan
+        and slice in Python.
+        """
+
+        scanner_factory = getattr(table, "scanner", None)
+        if callable(scanner_factory):
+            try:
+                scanner = scanner_factory(batch_size=batch_size)
+            except TypeError:
+                scanner = scanner_factory()
+            except Exception as exc:  # pragma: no cover - backend capability variation
+                LOGGER.debug("Scanner-based row iteration unavailable: %s", exc)
+                scanner = None
+
+            if scanner is not None:
+                to_batches = getattr(scanner, "to_batches", None)
+                if callable(to_batches):
+                    try:
+                        for batch in to_batches():
+                            rows = self._payload_to_rows(batch)
+                            if rows:
+                                yield rows
+                        return
+                    except Exception as exc:  # pragma: no cover - backend capability variation
+                        LOGGER.debug("Scanner to_batches iteration failed: %s", exc)
+
+        to_arrow = getattr(table, "to_arrow", None)
+        if callable(to_arrow):
+            try:
+                arrow_payload = to_arrow()
+                to_batches = getattr(arrow_payload, "to_batches", None)
+                if callable(to_batches):
+                    try:
+                        batches = to_batches(max_chunksize=batch_size)
+                    except TypeError:
+                        batches = to_batches()
+                    for batch in batches:
+                        rows = self._payload_to_rows(batch)
+                        if rows:
+                            yield rows
+                    return
+            except Exception as exc:  # pragma: no cover - backend capability variation
+                LOGGER.debug("Arrow batch iteration failed: %s", exc)
+
+        # Final fallback: materialize once and chunk in Python.
+        rows = self._table_scan_rows(table, limit=None)
+        for start in range(0, len(rows), batch_size):
+            chunk = rows[start : start + batch_size]
+            if chunk:
+                yield chunk
+
     def _migrate_v2_to_v3(self):
         """Create a v3 table from v2 rows and keep legacy table untouched.
 
@@ -204,19 +259,21 @@ class LanceMemoryStore:
 
         assert self._db is not None
         legacy_table = self._db.open_table(LEGACY_TABLE_NAME)
-        legacy_rows = self._table_scan_rows(legacy_table, limit=None)
-        source_count = len(legacy_rows)
+        count_rows = getattr(legacy_table, "count_rows", None)
+        expected_source_count: int | None = None
+        if callable(count_rows):
+            try:
+                expected_source_count = int(count_rows())
+            except Exception:  # pragma: no cover - backend capability variation
+                expected_source_count = None
 
-        if source_count == 0:
-            table = self._db.create_table(TABLE_NAME, data=[self._bootstrap_row_v3()])
-            table.delete("memory_id = '__schema__'")
-            LOGGER.info("Migrated %s -> %s with 0 rows (empty legacy table)", LEGACY_TABLE_NAME, TABLE_NAME)
-            return table
-
+        source_count = 0
         migrated_count = 0
+        batch_count = 0
         table = None
-        for start in range(0, source_count, MIGRATION_BATCH_SIZE):
-            chunk = legacy_rows[start : start + MIGRATION_BATCH_SIZE]
+        for chunk in self._iter_table_rows(legacy_table, batch_size=MIGRATION_BATCH_SIZE):
+            batch_count += 1
+            source_count += len(chunk)
             migrated_rows = []
             for row in chunk:
                 copied = dict(row)
@@ -230,16 +287,28 @@ class LanceMemoryStore:
                 table.add(migrated_rows)
             migrated_count += len(migrated_rows)
 
+        if source_count == 0:
+            table = self._db.create_table(TABLE_NAME, data=[self._bootstrap_row_v3()])
+            table.delete("memory_id = '__schema__'")
+            LOGGER.info("Migrated %s -> %s with 0 rows (empty legacy table)", LEGACY_TABLE_NAME, TABLE_NAME)
+            return table
+
         if table is None or migrated_count != source_count:
             raise RuntimeError(
                 f"v2->v3 migration row-count mismatch: source={source_count} migrated={migrated_count}"
             )
+        if expected_source_count is not None and source_count != expected_source_count:
+            raise RuntimeError(
+                "v2->v3 migration scan mismatch: "
+                f"count_rows={expected_source_count} scanned={source_count} migrated={migrated_count}"
+            )
 
         LOGGER.info(
-            "Migrated %s -> %s rows: %s (batch size: %s)",
+            "Migrated %s -> %s rows: %s across %s batches (batch size: %s)",
             LEGACY_TABLE_NAME,
             TABLE_NAME,
             migrated_count,
+            batch_count,
             MIGRATION_BATCH_SIZE,
         )
         return table

@@ -80,6 +80,36 @@ class _FakeArrowTable(_FakeTable):
         return super().search(*_args, **_kwargs)
 
 
+class _FakeScanner:
+    def __init__(self, rows, batch_size: int):
+        self._rows = [dict(row) for row in rows]
+        self._batch_size = batch_size
+
+    def to_batches(self):
+        for idx in range(0, len(self._rows), self._batch_size):
+            yield _FakeArrowPayload(self._rows[idx : idx + self._batch_size])
+
+
+class _FakeScannerTable(_FakeTable):
+    def __init__(self, rows):
+        super().__init__(rows)
+        self.search_called = False
+        self.to_arrow_called = False
+        self.scanner_called = False
+
+    def scanner(self, batch_size=1000):
+        self.scanner_called = True
+        return _FakeScanner(self.rows, batch_size=batch_size)
+
+    def to_arrow(self):
+        self.to_arrow_called = True
+        return _FakeArrowPayload(self.rows)
+
+    def search(self, *_args, **_kwargs):
+        self.search_called = True
+        return super().search(*_args, **_kwargs)
+
+
 def test_table_scan_prefers_table_exports_over_query_search(tmp_path, monkeypatch):
     """Storage scans should use table-native exports before query-style fallbacks."""
 
@@ -214,6 +244,62 @@ def test_large_migration_is_chunked_and_complete(tmp_path, monkeypatch):
     assert len(migrated_table.rows) == len(legacy_rows)
     assert migrated_table.add_calls == 2
     assert all(row["schema_version"] == 3 for row in migrated_table.rows)
+
+
+def test_migration_prefers_streaming_scanner_when_available(tmp_path, monkeypatch):
+    """Migration should use scanner batches before fallback table-export/query paths."""
+
+    legacy_rows = [
+        {
+            "memory_id": f"legacy-{idx}",
+            "schema_version": 2,
+            "tenant_id": "default",
+            "user_id": "legacy-user",
+            "agent_id": "main",
+            "text": f"legacy row {idx}",
+            "category": "fact",
+            "tags_json": "[]",
+            "importance": 0.7,
+            "scope": "user",
+            "sensitivity": "low",
+            "source_channel": None,
+            "source_session": None,
+            "source_actor": None,
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "ttl_expires_at": None,
+            "embedding_model_id": "text-embedding-3-large",
+            "content_hash": f"abc-{idx}",
+            "dedupe_key": None,
+            "provenance_source_type": "chat",
+            "provenance_source_ref": None,
+            "quality_confidence": 0.5,
+            "quality_verification_status": "unverified",
+            "quality_conflict_set_json": "[]",
+            "vector": [0.0, 0.0, 0.0, 0.0],
+        }
+        for idx in range(7)
+    ]
+    scanner_table = _FakeScannerTable(legacy_rows)
+    fake_db = _FakeDb({"memories_v2": scanner_table})
+
+    from app import storage as storage_module
+
+    monkeypatch.setattr(storage_module, "MIGRATION_BATCH_SIZE", 3)
+    monkeypatch.setattr(
+        storage_module.importlib,
+        "import_module",
+        lambda name: _FakeLanceModule(fake_db) if name == "lancedb" else None,
+    )
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store.ensure_initialized()
+
+    assert scanner_table.scanner_called is True
+    assert scanner_table.to_arrow_called is False
+    assert scanner_table.search_called is False
+    migrated_table = fake_db.tables["memories_v3"]
+    assert len(migrated_table.rows) == len(legacy_rows)
 
 
 def test_find_duplicate_scans_beyond_default_recall_limit(tmp_path):

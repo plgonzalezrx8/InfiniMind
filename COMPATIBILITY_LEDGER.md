@@ -382,3 +382,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep recall defaults bounded but require full-scope scans for dedupe/delete-adjacent paths so behavior does not depend on row ordering.
 - Impact:
   - Duplicate detection and scoped deletes remain correct when datasets exceed the recall default window.
+
+## 2026-02-24 — Feature: `fix(migration): stream v2->v3 migration to avoid full-table memory materialization`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Prefer scanner/batch iteration for legacy row migration and enforce scanned/migrated integrity checks before declaring success.
+- Impact:
+  - Large legacy migrations reduce memory pressure and fail fast on incomplete scans.
