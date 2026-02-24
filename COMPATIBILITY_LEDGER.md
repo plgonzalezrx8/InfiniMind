@@ -539,3 +539,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Re-run all release gates with shared scripts and retain profile-isolated OpenClaw validation to verify plugin discovery, slot wiring, and strict config compatibility before release.
 - Impact:
   - Final branch state is validated for service tests, OpenClaw contracts, bridge type/tests, secret scan, and executable bridge E2E checks. Local docker-smoke remained environment-blocked by host port `127.0.0.1:8080` in use by another stack, while hosted CI `docker-smoke` remains the authoritative merge gate.
+
+## 2026-02-24 — Feature: `docs(readme): expand root documentation into detailed beta/operator guide`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Expand README into a full Docker-first operations guide with explicit token/env mapping, bridge slot/config semantics, CI gate parity, and troubleshooting aligned to OpenClaw strict plugin/config behavior.
+- Impact:
+  - New operators can execute setup, validation, rollout, and beta checks end-to-end from a single detailed document.
