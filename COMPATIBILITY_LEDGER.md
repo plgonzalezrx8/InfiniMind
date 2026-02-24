@@ -265,3 +265,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Introduce `memories_v3` with `metadata_json` and migrate from `memories_v2` in-place without deleting legacy data.
 - Impact:
   - Metadata now round-trips through store/recall and existing v2 deployments can bootstrap forward safely.
+
+## 2026-02-24 — Feature: `feat(observability): add optional OpenTelemetry tracing`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/diagnostics-otel/openclaw.plugin.json
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Keep existing Prometheus metrics and add opt-in tracing behind explicit environment flags.
+- Impact:
+  - Operators can enable trace export without changing default runtime behavior.

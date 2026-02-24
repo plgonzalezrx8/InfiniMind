@@ -32,6 +32,7 @@ from .observability import (
     RECALL_FALLBACK_TOTAL,
     STORE_RESULTS_TOTAL,
     install_metrics_middleware,
+    install_optional_tracing,
     metrics_response,
 )
 from .policy import apply_hard_filters, apply_safe_fallback
@@ -48,6 +49,9 @@ async def _lifespan(_: FastAPI):
     """Initialize and tear down shared runtime dependencies."""
 
     settings = get_settings()
+    if not getattr(app.state, "tracing_initialized", False):
+        app.state.tracing_enabled = install_optional_tracing(app, settings)
+        app.state.tracing_initialized = True
     store = LanceMemoryStore(db_path=settings.lancedb_path, vector_dim=settings.vector_dim)
     store.ensure_initialized()
     app.state.memory_store = store

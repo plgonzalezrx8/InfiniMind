@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-large"
     openai_api_key: str | None = None
 
+    # Optional tracing controls; disabled by default for compatibility.
+    tracing_enabled: bool = False
+    tracing_exporter: str = "otlp"
+    tracing_otlp_endpoint: str | None = None
+    tracing_service_name: str = "infinimind-service"
+
     request_timeout_ms: int = 4000
 
     @property
