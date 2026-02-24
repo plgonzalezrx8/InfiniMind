@@ -71,7 +71,7 @@ Target file: `~/.openclaw/openclaw.json`.
 4. Configure `plugins.entries.infinimind-bridge.config`.
 5. Set `identityFallback: "error"` (recommended). If you use `"configured-default"`, set `defaultUserId`.
 
-Reference JSON example: [openclaw-config.example.json](/Users/pedrogonzalez/CascadeProjects/InfiniMind/deploy/openclaw-config.example.json)
+Reference JSON example: [openclaw-config.example.json](../../deploy/openclaw-config.example.json)
 
 ## Canary rollout steps
 
@@ -90,6 +90,7 @@ Reference JSON example: [openclaw-config.example.json](/Users/pedrogonzalez/Casc
 - Liveness: `GET /v1/health`
 - Readiness (auth): `GET /v1/ready`
 - Metrics: `GET /v1/metrics`
+- OpenClaw tool compatibility: `memory_store`, `memory_recall`, `memory_forget`, and `memory_search` alias
 - Forget workflow: `POST /v1/memory/forget` with `query` then delete via `memory_id`
 - Dry-run migration: `POST /v1/admin/reembed` with `dry_run=true`
 - Migration completeness: confirm `memories_v3` row count matches legacy `memories_v2` before cutover

@@ -34,6 +34,9 @@ Use this checklist before merging `codex/infinimind-mvp` into `main`.
   - `npm install --no-audit --no-fund` (inside `plugins/infinimind-openclaw-bridge`)
   - `npm run typecheck` (inside `plugins/infinimind-openclaw-bridge`)
   - `npm run test` (inside `plugins/infinimind-openclaw-bridge`)
+- Verify tool compatibility exposure:
+  - `memory_store`, `memory_recall`, `memory_forget`
+  - `memory_search` alias mapped to recall behavior
 - Ensure OpenClaw config references only discoverable plugin ids.
 - Run `openclaw plugins doctor` after enabling `infinimind-bridge`.
 - Ensure bridge config uses `identityFallback: "error"` unless a deliberate `defaultUserId` is configured.
@@ -51,7 +54,7 @@ Use this checklist before merging `codex/infinimind-mvp` into `main`.
 
 ## 5. Rollback readiness
 
-- Confirm rollback steps in [rollback.md](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/operators/rollback.md).
+- Confirm rollback steps in [rollback.md](rollback.md).
 - Confirm fallback memory slot target (`memory-core`) is available.
 
 ## 6. Merge readiness

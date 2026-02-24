@@ -16,7 +16,7 @@ This repository contains a working MVP implementation on branch `codex/infinimin
 
 ## Architecture
 
-1. OpenClaw calls `memory_store` / `memory_recall` / `memory_forget`.
+1. OpenClaw calls `memory_store` / `memory_recall` / `memory_forget` (or `memory_search` alias).
 2. `infinimind-bridge` plugin forwards calls over HTTP.
 3. InfiniMind service enforces policy and performs retrieval/ranking.
 4. Bridge returns OpenClaw-compatible tool content/details.
@@ -265,10 +265,16 @@ openclaw plugins list
 openclaw plugins info infinimind-bridge
 ```
 
+Tool compatibility notes:
+
+- Legacy tools remain available: `memory_store`, `memory_recall`, `memory_forget`
+- Dual-compat alias is available: `memory_search` (mapped to InfiniMind recall)
+- `memory_get` is intentionally out of scope for this bridge (file-backed core memory behavior)
+
 Full guidance:
 
-- [OpenClaw Integration](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/openclaw-integration.md)
-- [Operator Configuration](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/operators/configuration.md)
+- [OpenClaw Integration](docs/openclaw-integration.md)
+- [Operator Configuration](docs/operators/configuration.md)
 
 ## Testing
 
@@ -300,7 +306,7 @@ Primary rollback action is switching `plugins.slots.memory` back to `memory-core
 
 See full runbook:
 
-- [Rollback Guide](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/operators/rollback.md)
+- [Rollback Guide](docs/operators/rollback.md)
 
 ## Storage migration note
 
@@ -314,8 +320,8 @@ InfiniMind now reads/writes `memories_v3`.
 
 Use:
 
-- [Release Checklist](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/operators/release-checklist.md)
+- [Release Checklist](docs/operators/release-checklist.md)
 
 ## License
 
-MIT License. See [LICENSE](/Users/pedrogonzalez/CascadeProjects/InfiniMind/LICENSE).
+MIT License. See [LICENSE](LICENSE).

@@ -418,3 +418,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add `memory_search` as a recall alias while retaining legacy `memory_store`/`memory_recall`/`memory_forget` tooling.
 - Impact:
   - Bridge supports both current memory-core naming expectations and existing memory-lancedb-style workflows.
+
+## 2026-02-24 — Feature: `docs(portability): fix absolute links and sync docs with dual-tool behavior`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Replace machine-local absolute links with repository-relative paths and document dual tool compatibility (`memory_search` alias + legacy tools).
+- Impact:
+  - Documentation is portable across environments and aligned with current bridge behavior.
