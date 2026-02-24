@@ -529,3 +529,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add concise inline comments around profile isolation, fail-fast plugin verification order, and token-safety guardrails to preserve OpenClaw integration invariants.
 - Impact:
   - CI/E2E scripts are easier to maintain without changing runtime behavior or plugin contracts.
+
+## 2026-02-24 — Feature: `chore(release): final verification + compatibility ledger refresh`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Re-run all release gates with shared scripts and retain profile-isolated OpenClaw validation to verify plugin discovery, slot wiring, and strict config compatibility before release.
+- Impact:
+  - Final branch state is validated for service tests, OpenClaw contracts, bridge type/tests, secret scan, and executable bridge E2E checks. Local docker-smoke remained environment-blocked by host port `127.0.0.1:8080` in use by another stack, while hosted CI `docker-smoke` remains the authoritative merge gate.
