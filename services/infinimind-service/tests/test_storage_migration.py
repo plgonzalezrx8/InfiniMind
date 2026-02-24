@@ -21,9 +21,14 @@ class _FakeQuery:
 class _FakeTable:
     def __init__(self, rows):
         self.rows = [dict(row) for row in rows]
+        self.add_calls = 0
 
     def search(self, *_args, **_kwargs):
         return _FakeQuery(self.rows)
+
+    def add(self, rows):
+        self.add_calls += 1
+        self.rows.extend(dict(row) for row in rows)
 
     def delete(self, expression: str):
         if "memory_id = '__schema__'" in expression:
@@ -153,3 +158,59 @@ def test_boot_migrates_v2_rows_to_v3_table(tmp_path, monkeypatch):
     assert len(migrated_rows) == 1
     assert migrated_rows[0]["schema_version"] == 3
     assert migrated_rows[0]["metadata_json"] == "{}"
+
+
+def test_large_migration_is_chunked_and_complete(tmp_path, monkeypatch):
+    """Legacy migrations should copy every row in deterministic batches."""
+
+    legacy_rows = []
+    for idx in range(7):
+        legacy_rows.append(
+            {
+                "memory_id": f"legacy-{idx}",
+                "schema_version": 2,
+                "tenant_id": "default",
+                "user_id": "legacy-user",
+                "agent_id": "main",
+                "text": f"legacy row {idx}",
+                "category": "fact",
+                "tags_json": "[]",
+                "importance": 0.7,
+                "scope": "user",
+                "sensitivity": "low",
+                "source_channel": None,
+                "source_session": None,
+                "source_actor": None,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+                "ttl_expires_at": None,
+                "embedding_model_id": "text-embedding-3-large",
+                "content_hash": f"abc-{idx}",
+                "dedupe_key": None,
+                "provenance_source_type": "chat",
+                "provenance_source_ref": None,
+                "quality_confidence": 0.5,
+                "quality_verification_status": "unverified",
+                "quality_conflict_set_json": "[]",
+                "vector": [0.0, 0.0, 0.0, 0.0],
+            }
+        )
+
+    fake_db = _FakeDb({"memories_v2": _FakeTable(legacy_rows)})
+
+    from app import storage as storage_module
+
+    monkeypatch.setattr(storage_module, "MIGRATION_BATCH_SIZE", 3)
+    monkeypatch.setattr(
+        storage_module.importlib,
+        "import_module",
+        lambda name: _FakeLanceModule(fake_db) if name == "lancedb" else None,
+    )
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store.ensure_initialized()
+
+    migrated_table = fake_db.tables["memories_v3"]
+    assert len(migrated_table.rows) == len(legacy_rows)
+    assert migrated_table.add_calls == 2
+    assert all(row["schema_version"] == 3 for row in migrated_table.rows)

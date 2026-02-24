@@ -16,6 +16,7 @@ from .memory_schema import MemoryRecord
 LOGGER = logging.getLogger(__name__)
 TABLE_NAME = "memories_v3"
 LEGACY_TABLE_NAME = "memories_v2"
+MIGRATION_BATCH_SIZE = 10_000
 
 
 class LanceMemoryStore:
@@ -193,26 +194,55 @@ class LanceMemoryStore:
         return []
 
     def _migrate_v2_to_v3(self):
-        """Create a v3 table from v2 rows and keep legacy table untouched."""
+        """Create a v3 table from v2 rows and keep legacy table untouched.
+
+        Migration is intentionally additive:
+        - `memories_v2` remains present for rollback/debug.
+        - data is copied in deterministic batches to avoid one giant write.
+        - source and destination counts must match before we declare success.
+        """
 
         assert self._db is not None
         legacy_table = self._db.open_table(LEGACY_TABLE_NAME)
         legacy_rows = self._table_scan_rows(legacy_table, limit=None)
+        source_count = len(legacy_rows)
 
-        migrated_rows: list[dict[str, Any]] = []
-        for row in legacy_rows:
-            copied = dict(row)
-            copied["schema_version"] = 3
-            copied["metadata_json"] = copied.get("metadata_json") or "{}"
-            migrated_rows.append(copied)
-
-        if not migrated_rows:
-            migrated_rows = [self._bootstrap_row_v3()]
-            table = self._db.create_table(TABLE_NAME, data=migrated_rows)
+        if source_count == 0:
+            table = self._db.create_table(TABLE_NAME, data=[self._bootstrap_row_v3()])
             table.delete("memory_id = '__schema__'")
+            LOGGER.info("Migrated %s -> %s with 0 rows (empty legacy table)", LEGACY_TABLE_NAME, TABLE_NAME)
             return table
 
-        return self._db.create_table(TABLE_NAME, data=migrated_rows)
+        migrated_count = 0
+        table = None
+        for start in range(0, source_count, MIGRATION_BATCH_SIZE):
+            chunk = legacy_rows[start : start + MIGRATION_BATCH_SIZE]
+            migrated_rows = []
+            for row in chunk:
+                copied = dict(row)
+                copied["schema_version"] = 3
+                copied["metadata_json"] = copied.get("metadata_json") or "{}"
+                migrated_rows.append(copied)
+
+            if table is None:
+                table = self._db.create_table(TABLE_NAME, data=migrated_rows)
+            else:
+                table.add(migrated_rows)
+            migrated_count += len(migrated_rows)
+
+        if table is None or migrated_count != source_count:
+            raise RuntimeError(
+                f"v2->v3 migration row-count mismatch: source={source_count} migrated={migrated_count}"
+            )
+
+        LOGGER.info(
+            "Migrated %s -> %s rows: %s (batch size: %s)",
+            LEGACY_TABLE_NAME,
+            TABLE_NAME,
+            migrated_count,
+            MIGRATION_BATCH_SIZE,
+        )
+        return table
 
     def is_ready(self) -> bool:
         """Return true once the underlying table is fully initialized."""
