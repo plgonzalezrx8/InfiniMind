@@ -283,3 +283,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Document separate environment contexts (Docker, shell, OpenClaw process) and include identity fallback guidance in config examples.
 - Impact:
   - Setup and troubleshooting steps are now explicit about where tokens are sourced and how interpolation works.
+
+## 2026-02-24 — Feature: `test(audit): add regression coverage for bridge/service compatibility fixes`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Add targeted regression tests for bridge packaging/identity contracts, storage migration, forget flows, date validation, metadata round-trip, and tracing bootstrap.
+- Impact:
+  - The audited failure modes now have explicit automated coverage to prevent reintroduction.
