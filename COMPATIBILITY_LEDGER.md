@@ -337,3 +337,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add executable bridge tests for identity fallback modes and precedence ordering using mocked HTTP calls.
 - Impact:
   - Identity isolation logic is now behavior-tested instead of only schema/source-string checked.
+
+## 2026-02-24 — Feature: `docs(readme): align README with implemented API/features and add tracing config`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/gateway/configuration.md
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Update README architecture, API list, examples, and env guidance to match current store/recall/forget behavior and optional tracing controls.
+- Impact:
+  - Primary project documentation now matches implemented runtime capabilities and OpenClaw config semantics.

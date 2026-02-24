@@ -16,7 +16,7 @@ This repository contains a working MVP implementation on branch `codex/infinimin
 
 ## Architecture
 
-1. OpenClaw calls `memory_store` / `memory_recall`.
+1. OpenClaw calls `memory_store` / `memory_recall` / `memory_forget`.
 2. `infinimind-bridge` plugin forwards calls over HTTP.
 3. InfiniMind service enforces policy and performs retrieval/ranking.
 4. Bridge returns OpenClaw-compatible tool content/details.
@@ -102,12 +102,23 @@ Main service settings (from shell env or `.env`):
 - `INFINIMIND_EMBEDDING_PROVIDER`: `openai` or `mock`
 - `INFINIMIND_EMBEDDING_MODEL`: default `text-embedding-3-large`
 - `INFINIMIND_OPENAI_API_KEY`: required when provider is `openai`
+- `INFINIMIND_TRACING_ENABLED`: optional tracing toggle (`true`/`false`, default `false`)
+- `INFINIMIND_TRACING_EXPORTER`: tracing exporter (`otlp` or `console`, default `otlp`)
+- `INFINIMIND_TRACING_OTLP_ENDPOINT`: OTLP HTTP endpoint (required when exporter is `otlp`)
+- `INFINIMIND_TRACING_SERVICE_NAME`: service name reported in traces (default `infinimind-service`)
 
 Use the helper script:
 
 ```bash
 python3 scripts/generate_api_keys.py --help
 python3 scripts/generate_api_keys.py --write-env
+```
+
+Optional tracing quick enable (console exporter):
+
+```bash
+export INFINIMIND_TRACING_ENABLED=true
+export INFINIMIND_TRACING_EXPORTER=console
 ```
 
 ### Token mapping (important)
@@ -148,6 +159,7 @@ If these do not match exactly, requests fail with `401`.
 - `POST /v1/memory/store`
 - `POST /v1/memory/batch-store`
 - `POST /v1/memory/recall`
+- `POST /v1/memory/forget`
 - `POST /v1/admin/reembed`
 
 ### Minimal store example
@@ -184,6 +196,22 @@ curl -s \
   }'
 ```
 
+### Minimal forget example
+
+```bash
+curl -s \
+  -H "Authorization: Bearer ${INFINIMIND_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -X POST http://127.0.0.1:8080/v1/memory/forget \
+  -d '{
+    "tenant_id": "default",
+    "user_id": "user-1",
+    "agent_id": "main",
+    "query": "concise summaries",
+    "limit": 5
+  }'
+```
+
 ## OpenClaw integration (bridge plugin)
 
 1. Ensure plugin path is discoverable:
@@ -207,13 +235,15 @@ plugins: {
         apiKey: "${INFINIMIND_API_KEY}",
         timeoutMs: 4000,
         defaultScope: "user",
-          includeSensitiveDefault: false,
-          rerankDefault: "hybrid",
-          fallbackMode: "legacy-compatible",
-          identityFallback: "error"
-        }
+        includeSensitiveDefault: false,
+        rerankDefault: "hybrid",
+        fallbackMode: "legacy-compatible",
+        identityFallback: "error"
+        // Optional when identityFallback is "configured-default":
+        // defaultUserId: "fallback-user"
       }
     }
+  }
 }
 ```
 
@@ -271,6 +301,14 @@ Primary rollback action is switching `plugins.slots.memory` back to `memory-core
 See full runbook:
 
 - [Rollback Guide](/Users/pedrogonzalez/CascadeProjects/InfiniMind/docs/operators/rollback.md)
+
+## Storage migration note
+
+InfiniMind now reads/writes `memories_v3`.
+
+- If `memories_v2` exists and `memories_v3` does not, startup performs a non-destructive migration.
+- `memories_v2` is retained for rollback/debug; it is not deleted automatically.
+- Migration writes are batched and validated with source/destination row-count checks.
 
 ## Release and merge
 
