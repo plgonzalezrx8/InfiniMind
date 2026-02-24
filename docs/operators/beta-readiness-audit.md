@@ -18,8 +18,8 @@ Scope:
 | `bridge-quality` | yes | bridge/plugin team | `scripts/release_gates.sh --check bridge-quality` + `quality-gates` workflow |
 | `openclaw-contract` | yes | integration team | `scripts/release_gates.sh --check openclaw-contract` + `quality-gates` workflow |
 | `secret-scan` | yes | release/security owner | `scripts/release_gates.sh --check secret-scan` + `quality-gates` workflow |
-| `docker-smoke` | yes | operators/release owner | `scripts/release_gates.sh --check docker-smoke` + `docker-smoke` workflow |
-| `openclaw-e2e` | yes | integration/release owner | `scripts/release_gates.sh --check openclaw-e2e` + `openclaw-e2e` workflow |
+| `docker-smoke` | yes | operators/release owner | `scripts/release_gates.sh --check docker-smoke` + `quality-gates` workflow |
+| `openclaw-e2e` | yes | integration/release owner | `scripts/release_gates.sh --check openclaw-e2e` + `quality-gates` workflow |
 
 ## Baseline Evidence Snapshot
 

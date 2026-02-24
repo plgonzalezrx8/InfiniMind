@@ -179,7 +179,8 @@ Run same scripted checks used by CI:
 
 ```bash
 scripts/release_gates.sh
-OPENAI_API_KEY="" scripts/release_gates.sh --check docker-smoke
+scripts/release_gates.sh --check dependency-hygiene
+scripts/release_gates.sh --check docker-smoke
 OPENCLAW_BIN="$(pwd)/plugins/infinimind-openclaw-bridge/node_modules/.bin/openclaw" \
 scripts/release_gates.sh --check openclaw-e2e
 ```
@@ -187,7 +188,8 @@ scripts/release_gates.sh --check openclaw-e2e
 Notes:
 
 - `docker-smoke` blocks real-looking external secrets by default.
-- if intentional live-key smoke testing is required, set `INFINIMIND_ALLOW_REAL_KEYS=1`.
+- default smoke mode is synthetic (`INFINIMIND_SMOKE_KEY_MODE=synthetic`).
+- use `INFINIMIND_SMOKE_KEY_MODE=environment INFINIMIND_ALLOW_REAL_KEYS=1` only for intentional live-key smoke runs.
 - `openclaw-e2e` uses isolated profile and should not mutate default OpenClaw profile state.
 
 ### Manual OpenClaw checks
@@ -245,6 +247,41 @@ Monitor minimum metrics:
 - `infinimind_recall_fallback_total`
 - `infinimind_policy_note_total`
 - `infinimind_store_results_total`
+
+## Beta Go/No-Go Procedure
+
+### Preflight
+
+1. run all required checks:
+   - `scripts/release_gates.sh`
+   - `scripts/release_gates.sh --check dependency-hygiene`
+   - `scripts/release_gates.sh --check docker-smoke`
+   - `scripts/release_gates.sh --check openclaw-e2e`
+2. verify OpenClaw slot state:
+   - `openclaw --profile infinimind-ci config get plugins.slots.memory`
+3. verify bridge tool execution path:
+   - `scripts/openclaw_bridge_e2e.sh --profile infinimind-ci`
+
+### Live beta rollout
+
+1. start with one controlled cohort.
+2. run for at least 24h with `fallbackMode: "legacy-compatible"`.
+3. track latency/error/policy metrics every 15m.
+4. promote only when no P1/P2 findings appear in logs, metrics, or gates.
+
+### Incident rollback trigger
+
+Rollback immediately when one of these occurs:
+
+1. sustained auth failures (`401`) or server errors (`5xx`) from bridge traffic.
+2. plugin/slot drift where memory slot no longer resolves to `infinimind-bridge`.
+3. any policy leakage signal involving sensitive data.
+
+Rollback action path:
+
+1. set `plugins.slots.memory` back to `memory-core`.
+2. restart OpenClaw.
+3. capture logs + metrics + failing commands for incident record.
 
 ## Incident Troubleshooting
 
@@ -325,5 +362,6 @@ Before merge:
 
 - [README](../../README.md)
 - [OpenClaw Integration](../openclaw-integration.md)
+- [Beta Readiness Audit](beta-readiness-audit.md)
 - [Release Checklist](release-checklist.md)
 - [Rollback Guide](rollback.md)

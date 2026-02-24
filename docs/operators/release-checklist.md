@@ -15,10 +15,16 @@ Run default release checks:
 scripts/release_gates.sh
 ```
 
+Run dependency hygiene gate:
+
+```bash
+scripts/release_gates.sh --check dependency-hygiene
+```
+
 Run Docker-first smoke checks with synthetic keys:
 
 ```bash
-OPENAI_API_KEY="" scripts/release_gates.sh --check docker-smoke
+scripts/release_gates.sh --check docker-smoke
 ```
 
 Run OpenClaw bridge E2E checks with an isolated profile:
@@ -36,6 +42,7 @@ Confirm all required GitHub checks are green:
 - `bridge-quality`
 - `openclaw-contract`
 - `secret-scan`
+- `dependency-hygiene`
 - `docker-smoke`
 - `openclaw-e2e`
 
@@ -82,3 +89,13 @@ Confirm all required GitHub checks are green:
 - Open PR from `codex/infinimind-mvp` to `main`.
 - Include benchmark output from `scripts/benchmark_recall.py`.
 - Include canary plan and rollback owner.
+
+## 9. Beta go/no-go evidence
+
+Attach all of the following to the release PR:
+
+1. latest hosted `quality-gates` workflow URL (green).
+2. terminal output for local `scripts/release_gates.sh` and `--check dependency-hygiene`.
+3. profile-isolated OpenClaw E2E output showing tool execution success.
+4. canary metrics snapshot (`latency`, `error ratio`, `fallback`, `policy notes`) with owner sign-off.
+5. explicit rollback owner acknowledgment and tested rollback command transcript.

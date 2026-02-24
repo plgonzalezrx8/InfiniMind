@@ -639,3 +639,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Expand integration docs with copy/paste cookbook steps, strict field contract matrix, identity fallback decision tree, and symptom-based failure matrix.
 - Impact:
   - First-time operators now have a deterministic bridge configuration and validation path with less ambiguity during beta onboarding.
+
+## 2026-02-24 — Feature: `docs(beta): publish detailed beta runbook and go/no-go checklist`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/memory.md
+- Decision:
+  - Align README and operator runbooks around one beta flow: preflight gates, controlled canary, explicit incident triggers, and evidence-based go/no-go sign-off.
+- Impact:
+  - Beta operations are now documented as an executable procedure rather than a loose checklist, reducing rollout ambiguity for live OpenClaw deployments.
