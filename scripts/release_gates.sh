@@ -12,11 +12,12 @@ Checks:
   bridge-quality
   openclaw-contract
   secret-scan
+  dependency-hygiene
   docker-smoke
   openclaw-e2e
 
 If no --check flags are provided, the default release set is:
-  service-tests, bridge-quality, openclaw-contract, secret-scan
+  service-tests, bridge-quality, openclaw-contract, secret-scan, dependency-hygiene
 USAGE
 }
 
@@ -49,6 +50,10 @@ run_secret_scan() {
   "${ROOT_DIR}/scripts/secret_scan.sh"
 }
 
+run_dependency_hygiene() {
+  "${ROOT_DIR}/scripts/dependency_hygiene.sh"
+}
+
 run_docker_smoke() {
   "${ROOT_DIR}/scripts/docker_smoke.sh"
 }
@@ -79,7 +84,7 @@ done
 
 if [[ "${#checks[@]}" -eq 0 ]]; then
   # Default set mirrors required quality gates except the heavier docker/e2e checks.
-  checks=(service-tests bridge-quality openclaw-contract secret-scan)
+  checks=(service-tests bridge-quality openclaw-contract secret-scan dependency-hygiene)
 fi
 
 for check in "${checks[@]}"; do
@@ -96,6 +101,9 @@ for check in "${checks[@]}"; do
       ;;
     secret-scan)
       run_secret_scan
+      ;;
+    dependency-hygiene)
+      run_dependency_hygiene
       ;;
     docker-smoke)
       run_docker_smoke

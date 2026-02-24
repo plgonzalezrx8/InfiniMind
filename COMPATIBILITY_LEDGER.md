@@ -619,3 +619,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add explicit smoke key-source mode with deterministic synthetic defaults while preserving guardrails for real-looking external credentials.
 - Impact:
   - Local and CI smoke runs are reproducible even when operator shells contain unrelated live keys, without weakening default secret-safety behavior.
+
+## 2026-02-24 — Feature: `test(security): codify dependency and secret hygiene gates`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Add a reproducible dependency-hygiene gate (npm audit + pip-audit) and update service dependency constraints to a non-vulnerable Starlette line.
+- Impact:
+  - Release validation now fails fast on known dependency vulnerabilities and preserves strict secret scanning as a first-class beta gate.
