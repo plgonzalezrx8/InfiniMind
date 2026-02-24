@@ -118,3 +118,30 @@ test("identity precedence is userId -> actorId -> sessionId -> channelId", async
   assert.equal(capturedBody.user_id, "user-preferred");
   restoreFetch();
 });
+
+test("memory_search alias maps to recall endpoint and default recall behavior", async () => {
+  const api = new FakePluginApi(baseBridgeConfig({ identityFallback: "error" }));
+  bridgePlugin.register(api as never);
+
+  let capturedUrl = "";
+  let capturedBody: Record<string, unknown> = {};
+  const restoreFetch = withMockedFetch(async (url, init) => {
+    capturedUrl = url;
+    capturedBody = JSON.parse(String(init?.body ?? "{}"));
+    return new Response(JSON.stringify({ count: 0, memories: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  await api.tools.memory_search.execute("tc-4", {
+    query: "deployment history",
+    userId: "search-user",
+    limit: 2,
+  });
+  assert.ok(capturedUrl.endsWith("/v1/memory/recall"));
+  assert.equal(capturedBody.user_id, "search-user");
+  assert.equal(capturedBody.query, "deployment history");
+  assert.equal(capturedBody.limit, 2);
+  restoreFetch();
+});

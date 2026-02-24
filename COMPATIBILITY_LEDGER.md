@@ -409,3 +409,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Mirror strict config parsing for enum-backed settings and pin bridge OpenClaw dependency to the tested version.
 - Impact:
   - Bridge startup behavior is deterministic across installs and rejects invalid enum values before runtime calls.
+
+## 2026-02-24 — Feature: `feat(bridge-tools): add memory_search alias for dual compatibility`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-core/index.ts
+- Decision:
+  - Add `memory_search` as a recall alias while retaining legacy `memory_store`/`memory_recall`/`memory_forget` tooling.
+- Impact:
+  - Bridge supports both current memory-core naming expectations and existing memory-lancedb-style workflows.

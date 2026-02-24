@@ -58,6 +58,14 @@ def test_bridge_declares_memory_forget_mapping() -> None:
     assert '"deleted" | "candidates" | "not_found" | "missing_param"' in source
 
 
+def test_bridge_declares_memory_search_alias_mapping() -> None:
+    """Bridge source should expose memory_search alias mapped to recall endpoint."""
+
+    source = BRIDGE_INDEX_PATH.read_text(encoding="utf-8")
+    assert 'name: "memory_search"' in source
+    assert '"/v1/memory/recall"' in source
+
+
 def test_bridge_package_contract_for_install_and_typecheck() -> None:
     """Bridge package metadata should support install and deterministic typechecking."""
 

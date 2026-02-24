@@ -74,6 +74,68 @@ const infinimindBridgePlugin = {
     const cfg = bridgeConfigSchema.parse(api.pluginConfig);
     const client = new InfiniMindHttpClient(cfg);
 
+    const executeRecall = async (
+      params: Record<string, unknown>,
+      options: { includeAdvancedFilters: boolean },
+    ) => {
+      const resolvedUserId = resolveUserIdFromParams(params, cfg);
+      const payload = {
+        tenant_id: typeof params.tenantId === "string" ? params.tenantId : "default",
+        user_id: resolvedUserId,
+        agent_id: typeof params.agentId === "string" ? params.agentId : "main",
+        query: params.query,
+        limit: typeof params.limit === "number" ? params.limit : 5,
+        scope: typeof params.scope === "string" ? params.scope : cfg.defaultScope,
+        channel_id: typeof params.channelId === "string" ? params.channelId : null,
+        session_id: typeof params.sessionId === "string" ? params.sessionId : null,
+        actor_id: typeof params.actorId === "string" ? params.actorId : null,
+        categories: options.includeAdvancedFilters && Array.isArray(params.categories) ? params.categories : [],
+        tags_any: options.includeAdvancedFilters && Array.isArray(params.tagsAny) ? params.tagsAny : [],
+        min_importance:
+          options.includeAdvancedFilters && typeof params.minImportance === "number" ? params.minImportance : null,
+        since: options.includeAdvancedFilters && typeof params.since === "string" ? params.since : null,
+        until: options.includeAdvancedFilters && typeof params.until === "string" ? params.until : null,
+        include_expired: options.includeAdvancedFilters && params.includeExpired === true,
+        include_sensitive:
+          options.includeAdvancedFilters && typeof params.includeSensitive === "boolean"
+            ? params.includeSensitive
+            : cfg.includeSensitiveDefault,
+        rerank:
+          options.includeAdvancedFilters && typeof params.rerank === "string" ? params.rerank : cfg.rerankDefault,
+        debug: options.includeAdvancedFilters && params.debug === true,
+        trust_level:
+          options.includeAdvancedFilters && typeof params.trustLevel === "string" ? params.trustLevel : "medium",
+        fallback_mode:
+          options.includeAdvancedFilters && typeof params.fallbackMode === "string"
+            ? params.fallbackMode
+            : cfg.fallbackMode,
+      };
+
+      const result = await client.post<RecallResponse>("/v1/memory/recall", payload);
+      if (result.count === 0) {
+        return {
+          content: [{ type: "text" as const, text: "No relevant memories found." }],
+          details: { count: 0, memories: [] },
+        };
+      }
+
+      const text = result.memories
+        .map(
+          (memory, idx) =>
+            `${idx + 1}. [${memory.category}] ${memory.text} (${(memory.score * 100).toFixed(0)}%)`,
+        )
+        .join("\n");
+
+      return {
+        content: [{ type: "text" as const, text: `Found ${result.count} memories:\n\n${text}` }],
+        details: {
+          count: result.count,
+          memories: result.memories,
+          debug: result.debug ?? null,
+        },
+      };
+    };
+
     api.registerTool(
       {
         name: "memory_store",
@@ -177,58 +239,34 @@ const infinimindBridgePlugin = {
           ),
         }),
         async execute(_toolCallId, params) {
-          const p = params as Record<string, unknown>;
-          const resolvedUserId = resolveUserIdFromParams(p, cfg);
-          const payload = {
-            tenant_id: typeof p.tenantId === "string" ? p.tenantId : "default",
-            user_id: resolvedUserId,
-            agent_id: typeof p.agentId === "string" ? p.agentId : "main",
-            query: p.query,
-            limit: typeof p.limit === "number" ? p.limit : 5,
-            scope: typeof p.scope === "string" ? p.scope : cfg.defaultScope,
-            channel_id: typeof p.channelId === "string" ? p.channelId : null,
-            session_id: typeof p.sessionId === "string" ? p.sessionId : null,
-            actor_id: typeof p.actorId === "string" ? p.actorId : null,
-            categories: Array.isArray(p.categories) ? p.categories : [],
-            tags_any: Array.isArray(p.tagsAny) ? p.tagsAny : [],
-            min_importance: typeof p.minImportance === "number" ? p.minImportance : null,
-            since: typeof p.since === "string" ? p.since : null,
-            until: typeof p.until === "string" ? p.until : null,
-            include_expired: p.includeExpired === true,
-            include_sensitive:
-              typeof p.includeSensitive === "boolean" ? p.includeSensitive : cfg.includeSensitiveDefault,
-            rerank: typeof p.rerank === "string" ? p.rerank : cfg.rerankDefault,
-            debug: p.debug === true,
-            trust_level: typeof p.trustLevel === "string" ? p.trustLevel : "medium",
-            fallback_mode: typeof p.fallbackMode === "string" ? p.fallbackMode : cfg.fallbackMode,
-          };
-
-          const result = await client.post<RecallResponse>("/v1/memory/recall", payload);
-          if (result.count === 0) {
-            return {
-              content: [{ type: "text", text: "No relevant memories found." }],
-              details: { count: 0, memories: [] },
-            };
-          }
-
-          const text = result.memories
-            .map(
-              (memory, idx) =>
-                `${idx + 1}. [${memory.category}] ${memory.text} (${(memory.score * 100).toFixed(0)}%)`,
-            )
-            .join("\n");
-
-          return {
-            content: [{ type: "text", text: `Found ${result.count} memories:\n\n${text}` }],
-            details: {
-              count: result.count,
-              memories: result.memories,
-              debug: result.debug ?? null,
-            },
-          };
+          return executeRecall(params as Record<string, unknown>, { includeAdvancedFilters: true });
         },
       },
       { name: "memory_recall" },
+    );
+
+    api.registerTool(
+      {
+        name: "memory_search",
+        label: "Memory Search",
+        description: "Search memories through the external InfiniMind service.",
+        parameters: Type.Object({
+          query: Type.String({ description: "Search query" }),
+          limit: Type.Optional(Type.Number({ description: "Max results (default: 5)" })),
+          userId: Type.Optional(Type.String()),
+          tenantId: Type.Optional(Type.String()),
+          agentId: Type.Optional(Type.String()),
+          channelId: Type.Optional(Type.String()),
+          sessionId: Type.Optional(Type.String()),
+          actorId: Type.Optional(Type.String()),
+        }),
+        async execute(_toolCallId, params) {
+          // Alias keeps compatibility with newer OpenClaw memory naming while
+          // preserving existing InfiniMind recall behavior.
+          return executeRecall(params as Record<string, unknown>, { includeAdvancedFilters: false });
+        },
+      },
+      { name: "memory_search" },
     );
 
     api.registerTool(
