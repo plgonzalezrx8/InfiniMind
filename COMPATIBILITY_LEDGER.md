@@ -629,3 +629,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add a reproducible dependency-hygiene gate (npm audit + pip-audit) and update service dependency constraints to a non-vulnerable Starlette line.
 - Impact:
   - Release validation now fails fast on known dependency vulnerabilities and preserves strict secret scanning as a first-class beta gate.
+
+## 2026-02-24 — Feature: `docs(plugin): publish rich plugin usage/config cookbook`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+- Decision:
+  - Expand integration docs with copy/paste cookbook steps, strict field contract matrix, identity fallback decision tree, and symptom-based failure matrix.
+- Impact:
+  - First-time operators now have a deterministic bridge configuration and validation path with less ambiguity during beta onboarding.
