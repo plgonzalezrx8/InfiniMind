@@ -54,6 +54,53 @@ class _FakeLanceModule:
         return self._db
 
 
+class _FakeArrowPayload:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def to_pylist(self):
+        return [dict(row) for row in self._rows]
+
+
+class _FakeArrowTable(_FakeTable):
+    def __init__(self, rows):
+        super().__init__(rows)
+        self.search_called = False
+
+    def to_arrow(self):
+        return _FakeArrowPayload(self.rows)
+
+    def search(self, *_args, **_kwargs):
+        self.search_called = True
+        return super().search(*_args, **_kwargs)
+
+
+def test_table_scan_prefers_table_exports_over_query_search(tmp_path, monkeypatch):
+    """Storage scans should use table-native exports before query-style fallbacks."""
+
+    fake_table = _FakeArrowTable(
+        [
+            {"memory_id": "one", "schema_version": 3, "tenant_id": "default", "user_id": "u", "agent_id": "main"},
+            {"memory_id": "two", "schema_version": 3, "tenant_id": "default", "user_id": "u", "agent_id": "main"},
+        ]
+    )
+    fake_db = _FakeDb({"memories_v3": fake_table})
+
+    from app import storage as storage_module
+
+    monkeypatch.setattr(
+        storage_module.importlib,
+        "import_module",
+        lambda name: _FakeLanceModule(fake_db) if name == "lancedb" else None,
+    )
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    rows = store.list_memories(limit=10)
+    assert len(rows) == 2
+    assert rows[0]["memory_id"] == "one"
+    assert fake_table.search_called is False
+
+
 def test_boot_migrates_v2_rows_to_v3_table(tmp_path, monkeypatch):
     """Store bootstrap should migrate legacy v2 rows into the v3 schema table."""
 

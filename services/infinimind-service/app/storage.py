@@ -111,11 +111,84 @@ class LanceMemoryStore:
 
         to_list = getattr(query, "to_list", None)
         if callable(to_list):
-            return to_list()
+            return self._payload_to_rows(to_list())
 
         to_arrow = getattr(query, "to_arrow", None)
         if callable(to_arrow):
-            return to_arrow().to_pylist()
+            return self._payload_to_rows(to_arrow())
+
+        return []
+
+    def _payload_to_rows(self, payload: Any) -> list[dict[str, Any]]:
+        """Convert common table/query payload types into row dictionaries.
+
+        LanceDB and its dependencies may return result payloads as list-like
+        objects, Arrow tables, or pandas DataFrames depending on version. This
+        helper normalizes those variants to a single row-list shape.
+        """
+
+        if payload is None:
+            return []
+        if isinstance(payload, list):
+            return [dict(row) for row in payload]
+
+        to_pylist = getattr(payload, "to_pylist", None)
+        if callable(to_pylist):
+            return [dict(row) for row in to_pylist()]
+
+        to_dict = getattr(payload, "to_dict", None)
+        if callable(to_dict):
+            try:
+                rows = to_dict("records")
+            except TypeError:
+                rows = to_dict()
+            if isinstance(rows, list):
+                return [dict(row) for row in rows]
+
+        return []
+
+    def _table_scan_rows(self, table: Any, *, limit: int | None) -> list[dict[str, Any]]:
+        """Read rows from a table using version-safe, non-query scan methods.
+
+        We intentionally avoid relying on `search()` for full scans because some
+        LanceDB variants require a query vector. The method order below prefers
+        stable table-export paths and only uses query APIs as a last resort.
+        """
+
+        scan_methods = ("to_arrow", "to_pandas", "to_list")
+        for method_name in scan_methods:
+            method = getattr(table, method_name, None)
+            if not callable(method):
+                continue
+
+            payload = None
+            try:
+                payload = method() if limit is None else method(limit=limit)
+            except TypeError:
+                # Some builds accept no keyword args; retry without `limit`.
+                try:
+                    payload = method()
+                except Exception as exc:  # pragma: no cover - backend capability variation
+                    LOGGER.debug("Skipping table scan method %s: %s", method_name, exc)
+                    continue
+            except Exception as exc:  # pragma: no cover - backend capability variation
+                LOGGER.debug("Skipping table scan method %s: %s", method_name, exc)
+                continue
+
+            rows = self._payload_to_rows(payload)
+            return rows if limit is None else rows[:limit]
+
+        search = getattr(table, "search", None)
+        if callable(search):
+            try:
+                query = search()
+                limiter = getattr(query, "limit", None)
+                if callable(limiter) and limit is not None:
+                    query = limiter(limit)
+                rows = self._query_results_to_rows(query)
+                return rows if limit is None else rows[:limit]
+            except Exception as exc:  # pragma: no cover - backend capability variation
+                LOGGER.debug("Search-based scan fallback failed: %s", exc)
 
         return []
 
@@ -124,7 +197,7 @@ class LanceMemoryStore:
 
         assert self._db is not None
         legacy_table = self._db.open_table(LEGACY_TABLE_NAME)
-        legacy_rows = self._query_results_to_rows(legacy_table.search().limit(500_000))
+        legacy_rows = self._table_scan_rows(legacy_table, limit=None)
 
         migrated_rows: list[dict[str, Any]] = []
         for row in legacy_rows:
@@ -255,9 +328,8 @@ class LanceMemoryStore:
 
         assert self._table is not None
 
-        # to_list exists on recent LanceDB builds. We keep a fallback path for
-        # compatibility with older variants.
-        return self._query_results_to_rows(self._table.search().limit(limit))
+        # Full-table scans use table-native export methods first for compatibility.
+        return self._table_scan_rows(self._table, limit=limit)
 
     def vector_search(self, query_vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
         """Run approximate vector similarity search against stored rows."""

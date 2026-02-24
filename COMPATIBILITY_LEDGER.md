@@ -301,3 +301,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Capture final validation gates and hardening checks in the release checklist for pre-merge enforcement.
 - Impact:
   - Audit remediation now ships with explicit merge gates for packaging, identity safety, migration behavior, and secret hygiene.
+
+## 2026-02-24 — Feature: `fix(storage): replace scan-based row listing with version-safe table scan helpers`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Prefer table-native export/scan methods for full-row reads and keep query-style search as a last-resort fallback.
+- Impact:
+  - Storage reads are less sensitive to LanceDB query API differences across versions.
