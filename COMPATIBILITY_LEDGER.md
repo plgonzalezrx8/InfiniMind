@@ -373,3 +373,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Re-run full validation gates (service/openclaw tests, bridge typecheck/tests, secret scans) and record final compatibility checks.
 - Impact:
   - Branch is validated against the remediation acceptance criteria with auditable verification history.
+
+## 2026-02-24 — Feature: `fix(storage): remove correctness-limiting 5k caps from dedupe/delete critical paths`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+- Decision:
+  - Keep recall defaults bounded but require full-scope scans for dedupe/delete-adjacent paths so behavior does not depend on row ordering.
+- Impact:
+  - Duplicate detection and scoped deletes remain correct when datasets exceed the recall default window.

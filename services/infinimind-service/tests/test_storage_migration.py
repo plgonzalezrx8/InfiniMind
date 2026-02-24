@@ -214,3 +214,79 @@ def test_large_migration_is_chunked_and_complete(tmp_path, monkeypatch):
     assert len(migrated_table.rows) == len(legacy_rows)
     assert migrated_table.add_calls == 2
     assert all(row["schema_version"] == 3 for row in migrated_table.rows)
+
+
+def test_find_duplicate_scans_beyond_default_recall_limit(tmp_path):
+    """Dedupe checks should not miss matches that appear after the first 5000 rows."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store._in_memory_mode = True
+    store._rows = [
+        {
+            "memory_id": f"m-{idx}",
+            "tenant_id": "default",
+            "user_id": "user-a",
+            "agent_id": "main",
+            "content_hash": f"hash-{idx}",
+            "dedupe_key": None,
+        }
+        for idx in range(6000)
+    ]
+    store._rows.append(
+        {
+            "memory_id": "late-match",
+            "tenant_id": "default",
+            "user_id": "user-a",
+            "agent_id": "main",
+            "content_hash": "target-hash",
+            "dedupe_key": None,
+        }
+    )
+
+    duplicate = store.find_duplicate(
+        tenant_id="default",
+        user_id="user-a",
+        agent_id="main",
+        content_hash="target-hash",
+        dedupe_key=None,
+    )
+    assert duplicate is not None
+    assert duplicate["memory_id"] == "late-match"
+
+
+def test_delete_memory_scans_beyond_default_recall_limit(tmp_path):
+    """Scoped delete should work even when target rows are beyond the first 5000 entries."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store._in_memory_mode = True
+    store._rows = [
+        {
+            "memory_id": f"m-{idx}",
+            "tenant_id": "default",
+            "user_id": "user-a",
+            "agent_id": "main",
+        }
+        for idx in range(6000)
+    ]
+    store._rows.append(
+        {
+            "memory_id": "to-delete",
+            "tenant_id": "default",
+            "user_id": "user-a",
+            "agent_id": "main",
+        }
+    )
+
+    deleted = store.delete_memory(
+        tenant_id="default",
+        user_id="user-a",
+        agent_id="main",
+        memory_id="to-delete",
+    )
+    assert deleted is True
+    assert store.find_scoped_memory_by_id(
+        tenant_id="default",
+        user_id="user-a",
+        agent_id="main",
+        memory_id="to-delete",
+    ) is None

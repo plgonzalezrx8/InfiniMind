@@ -335,7 +335,8 @@ class LanceMemoryStore:
     ) -> dict[str, Any] | None:
         """Find an existing row that matches dedupe constraints."""
 
-        rows = self.list_memories(limit=5000)
+        # Dedupe is correctness-critical: scan full scoped data to avoid false negatives.
+        rows = self.list_all_memories()
         for row in rows:
             if row.get("tenant_id") != tenant_id:
                 continue
@@ -360,6 +361,20 @@ class LanceMemoryStore:
 
         # Full-table scans use table-native export methods first for compatibility.
         return self._table_scan_rows(self._table, limit=limit)
+
+    def list_all_memories(self) -> list[dict[str, Any]]:
+        """Return all rows for correctness-sensitive operations.
+
+        Use this only when truncation would be a behavioral bug (for example,
+        dedupe checks or scoped deletes).
+        """
+
+        self.ensure_initialized()
+        if self._in_memory_mode:
+            return list(self._rows)
+
+        assert self._table is not None
+        return self._table_scan_rows(self._table, limit=None)
 
     def vector_search(self, query_vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
         """Run approximate vector similarity search against stored rows."""
@@ -419,10 +434,17 @@ class LanceMemoryStore:
         self._db.create_table(table_name, data=shadow_rows)
         return table_name
 
-    def scoped_memories(self, *, tenant_id: str, user_id: str, agent_id: str, limit: int = 5000) -> list[dict[str, Any]]:
+    def scoped_memories(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Return rows constrained to one tenant/user/agent boundary."""
 
-        rows = self.list_memories(limit=limit)
+        rows = self.list_all_memories() if limit is None else self.list_memories(limit=limit)
         return [
             row
             for row in rows
@@ -431,13 +453,32 @@ class LanceMemoryStore:
             and row.get("agent_id") == agent_id
         ]
 
+    def find_scoped_memory_by_id(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        memory_id: str,
+    ) -> dict[str, Any] | None:
+        """Find a single memory row within one tenant/user/agent boundary."""
+
+        for row in self.scoped_memories(tenant_id=tenant_id, user_id=user_id, agent_id=agent_id, limit=None):
+            if str(row.get("memory_id")) == memory_id:
+                return row
+        return None
+
     def delete_memory(self, *, tenant_id: str, user_id: str, agent_id: str, memory_id: str) -> bool:
         """Delete one scoped memory row and return whether a row was removed."""
 
         self.ensure_initialized()
-        scoped = self.scoped_memories(tenant_id=tenant_id, user_id=user_id, agent_id=agent_id, limit=5000)
-        exists = any(str(row.get("memory_id")) == memory_id for row in scoped)
-        if not exists:
+        match = self.find_scoped_memory_by_id(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            memory_id=memory_id,
+        )
+        if match is None:
             return False
 
         if self._in_memory_mode:

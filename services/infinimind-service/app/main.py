@@ -382,7 +382,8 @@ def forget(payload: ForgetRequest) -> ForgetResponse:
             tenant_id=payload.tenant_id,
             user_id=payload.user_id,
             agent_id=payload.agent_id,
-            limit=5000,
+            # Forget is delete-adjacent: scan full scope to avoid hidden truncation.
+            limit=None,
         )
         if not rows:
             return ForgetResponse(action="not_found", found=0)
