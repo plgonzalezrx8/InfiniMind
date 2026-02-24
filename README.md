@@ -752,6 +752,7 @@ Full runbook:
 - [OpenClaw Integration](docs/openclaw-integration.md)
 - [Operator Configuration](docs/operators/configuration.md)
 - [Release Checklist](docs/operators/release-checklist.md)
+- [Beta Readiness Report](docs/operators/beta-readiness-report.md)
 - [Compatibility Ledger](COMPATIBILITY_LEDGER.md)
 
 ## License

@@ -363,5 +363,6 @@ Before merge:
 - [README](../../README.md)
 - [OpenClaw Integration](../openclaw-integration.md)
 - [Beta Readiness Audit](beta-readiness-audit.md)
+- [Beta Readiness Report](beta-readiness-report.md)
 - [Release Checklist](release-checklist.md)
 - [Rollback Guide](rollback.md)

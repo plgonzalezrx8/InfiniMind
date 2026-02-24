@@ -649,3 +649,14 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Align README and operator runbooks around one beta flow: preflight gates, controlled canary, explicit incident triggers, and evidence-based go/no-go sign-off.
 - Impact:
   - Beta operations are now documented as an executable procedure rather than a loose checklist, reducing rollout ambiguity for live OpenClaw deployments.
+
+## 2026-02-24 — Feature: `chore(release): final beta readiness report + compatibility ledger refresh`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Finalize beta-readiness reporting with explicit gate outcomes, dependency-security posture, and environment-qualified heavy-gate constraints.
+- Impact:
+  - Release evidence is consolidated in one operator-facing report, with auditable confirmation of quality/security checks and OpenClaw compatibility assumptions.
