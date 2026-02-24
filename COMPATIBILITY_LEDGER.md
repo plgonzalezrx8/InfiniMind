@@ -491,3 +491,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add an env-gated pytest harness and dedicated workflow that runs profile-isolated bridge checks without channel dependencies.
 - Impact:
   - OpenClaw bridge integration can be validated in hosted CI with deterministic setup and failure reporting.
+
+## 2026-02-24 — Feature: `fix(ops): harden script/env safety and secret handling`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+- Decision:
+  - Keep profile-isolated OpenClaw checks, but harden script execution to redact tokens and block real-looking external secrets in CI unless explicitly overridden.
+- Impact:
+  - E2E and smoke automation remain safe-by-default and reduce accidental secret exposure in logs and CI pipelines.

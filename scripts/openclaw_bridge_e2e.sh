@@ -12,6 +12,28 @@ OPENCLAW_BIN="${OPENCLAW_BIN:-openclaw}"
 SKIP_COMPOSE=0
 KEEP_STACK=0
 
+redact_value() {
+  local raw="${1:-}"
+  local n="${#raw}"
+  if [[ "${n}" -le 8 ]]; then
+    printf "***"
+    return
+  fi
+  printf "%s***%s" "${raw:0:4}" "${raw: -4}"
+}
+
+looks_like_external_secret() {
+  local value="${1:-}"
+  [[ "${value}" =~ ^sk- ]] && return 0
+  [[ "${value}" =~ ^ghp_ ]] && return 0
+  [[ "${value}" =~ ^github_pat_ ]] && return 0
+  [[ "${value}" =~ ^AKIA[0-9A-Z]{16}$ ]] && return 0
+  [[ "${value}" =~ ^ASIA[0-9A-Z]{16}$ ]] && return 0
+  [[ "${value}" =~ ^xox[baprs]- ]] && return 0
+  [[ "${value}" =~ ^AIza[0-9A-Za-z_-]{35}$ ]] && return 0
+  return 1
+}
+
 usage() {
   cat <<'EOF'
 Usage: scripts/openclaw_bridge_e2e.sh [options]
@@ -87,6 +109,31 @@ if [[ "${SKIP_COMPOSE}" -eq 0 ]]; then
   fi
 fi
 
+if [[ -z "${INFINIMIND_API_KEY:-}" ]]; then
+  INFINIMIND_API_KEY="$(python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(24))
+PY
+)"
+fi
+
+if [[ -z "${INFINIMIND_ADMIN_API_KEY:-}" ]]; then
+  INFINIMIND_ADMIN_API_KEY="${INFINIMIND_API_KEY}-admin"
+fi
+
+# CI safety: block external-provider-looking secrets unless explicitly overridden.
+if [[ "${CI:-}" == "true" && "${INFINIMIND_ALLOW_REAL_KEYS:-0}" != "1" ]]; then
+  for candidate in "${INFINIMIND_API_KEY}" "${INFINIMIND_ADMIN_API_KEY}" "${OPENAI_API_KEY:-}"; do
+    if [[ -n "${candidate}" ]] && looks_like_external_secret "${candidate}"; then
+      echo "Refusing to run with real-looking secrets in CI. Set INFINIMIND_ALLOW_REAL_KEYS=1 to override." >&2
+      exit 1
+    fi
+  done
+fi
+
+echo "Using API token: $(redact_value "${INFINIMIND_API_KEY}")"
+echo "Using admin token: $(redact_value "${INFINIMIND_ADMIN_API_KEY}")"
+
 echo "Waiting for service health: ${BASE_URL}/v1/health"
 for i in $(seq 1 60); do
   if curl -fsS "${BASE_URL}/v1/health" >/dev/null; then
@@ -102,14 +149,6 @@ done
 PROFILE_DIR="${HOME}/.openclaw-${PROFILE}"
 CONFIG_PATH="${PROFILE_DIR}/openclaw.json"
 mkdir -p "${PROFILE_DIR}"
-
-if [[ -z "${INFINIMIND_API_KEY:-}" ]]; then
-  INFINIMIND_API_KEY="$(python3 - <<'PY'
-import secrets
-print(secrets.token_urlsafe(24))
-PY
-)"
-fi
 
 echo "Writing isolated OpenClaw config: ${CONFIG_PATH}"
 python3 - <<'PY' "${CONFIG_PATH}" "${PLUGIN_PATH}" "${BASE_URL}" "${INFINIMIND_API_KEY}"
