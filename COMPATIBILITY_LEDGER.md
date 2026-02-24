@@ -500,3 +500,13 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep profile-isolated OpenClaw checks, but harden script execution to redact tokens and block real-looking external secrets in CI unless explicitly overridden.
 - Impact:
   - E2E and smoke automation remain safe-by-default and reduce accidental secret exposure in logs and CI pipelines.
+
+## 2026-02-24 — Feature: `test(release): codify release checklist checks into runnable gates`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+- Decision:
+  - Centralize release checks in reusable scripts (`release_gates`, `docker_smoke`, `secret_scan`) and run those scripts from CI workflows to preserve strict plugin/config contracts and profile-safe integration behavior.
+- Impact:
+  - CI and local release verification now execute the same gate commands, reducing manual drift and making failures reproducible.

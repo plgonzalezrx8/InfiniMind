@@ -36,10 +36,9 @@ jobs:
 
       - name: Run OpenClaw bridge CLI E2E harness
         env:
-          RUN_OPENCLAW_E2E: "1"
           OPENCLAW_BIN: ${{ github.workspace }}/plugins/infinimind-openclaw-bridge/node_modules/.bin/openclaw
           INFINIMIND_EMBEDDING_PROVIDER: mock
           INFINIMIND_EMBEDDING_MODEL: text-embedding-3-large
           INFINIMIND_API_KEY: infinimind-e2e-token
           INFINIMIND_ADMIN_API_KEY: infinimind-e2e-admin-token
-        run: python3 -m pytest tests/openclaw/test_openclaw_cli_e2e.py -q
+        run: scripts/release_gates.sh --check openclaw-e2e

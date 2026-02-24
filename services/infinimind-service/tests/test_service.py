@@ -3,6 +3,65 @@
 from __future__ import annotations
 
 
+def _mutate_stored_json_fields(
+    client,
+    *,
+    tenant_id: str,
+    user_id: str,
+    agent_id: str,
+    memory_id: str,
+    updates: dict[str, str],
+) -> None:
+    """Mutate persisted JSON string fields in a backend-agnostic way for corruption tests."""
+
+    store = client.app.state.memory_store
+
+    if getattr(store, "_in_memory_mode", False):
+        for row in store._rows:
+            if (
+                row.get("memory_id") == memory_id
+                and row.get("tenant_id") == tenant_id
+                and row.get("user_id") == user_id
+                and row.get("agent_id") == agent_id
+            ):
+                row.update(updates)
+                return
+        raise AssertionError(f"row not found for memory_id={memory_id}")
+
+    target_row = store.find_scoped_memory_by_id(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        agent_id=agent_id,
+        memory_id=memory_id,
+    )
+    if target_row is None:
+        raise AssertionError(f"row not found for memory_id={memory_id}")
+
+    # LanceDB does not expose portable row-update APIs; replace row via scoped delete + add.
+    mutated_row = dict(target_row)
+    mutated_row.update(updates)
+
+    table = store._table
+    if table is None:
+        raise AssertionError("expected LanceDB table to be initialized")
+
+    safe_memory_id = memory_id.replace("'", "''")
+    safe_tenant_id = tenant_id.replace("'", "''")
+    safe_user_id = user_id.replace("'", "''")
+    safe_agent_id = agent_id.replace("'", "''")
+    table.delete(
+        " and ".join(
+            [
+                f"memory_id = '{safe_memory_id}'",
+                f"tenant_id = '{safe_tenant_id}'",
+                f"user_id = '{safe_user_id}'",
+                f"agent_id = '{safe_agent_id}'",
+            ]
+        )
+    )
+    table.add([mutated_row])
+
+
 def test_health_and_ready(client, auth_headers):
     """Health is public; readiness requires authentication."""
 
@@ -323,11 +382,14 @@ def test_recall_handles_invalid_metadata_json(client, auth_headers):
     assert store.status_code == 200
     memory_id = store.json()["memory_id"]
 
-    # Tests run in in-memory mode; mutate raw row payload to emulate corrupted stored JSON.
-    for row in client.app.state.memory_store._rows:
-        if row.get("memory_id") == memory_id:
-            row["metadata_json"] = "{bad-json"
-            break
+    _mutate_stored_json_fields(
+        client,
+        tenant_id="default",
+        user_id="corrupt-metadata-user",
+        agent_id="main",
+        memory_id=memory_id,
+        updates={"metadata_json": "{bad-json"},
+    )
 
     recall = client.post(
         "/v1/memory/recall",
@@ -366,12 +428,17 @@ def test_recall_handles_invalid_tags_and_conflict_json(client, auth_headers):
     assert store.status_code == 200
     memory_id = store.json()["memory_id"]
 
-    # Tests run in in-memory mode; mutate raw row payload to emulate corrupted stored JSON.
-    for row in client.app.state.memory_store._rows:
-        if row.get("memory_id") == memory_id:
-            row["tags_json"] = "{bad-json"
-            row["quality_conflict_set_json"] = "{bad-json"
-            break
+    _mutate_stored_json_fields(
+        client,
+        tenant_id="default",
+        user_id="corrupt-lists-user",
+        agent_id="main",
+        memory_id=memory_id,
+        updates={
+            "tags_json": "{bad-json",
+            "quality_conflict_set_json": "{bad-json",
+        },
+    )
 
     recall = client.post(
         "/v1/memory/recall",
