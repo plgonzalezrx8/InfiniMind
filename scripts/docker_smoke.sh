@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-${ROOT_DIR}/deploy/docker-compose.yml}"
 BASE_URL="${INFINIMIND_BASE_URL:-http://127.0.0.1:8080}"
 KEEP_STACK="${KEEP_STACK:-0}"
+SMOKE_KEY_MODE="${INFINIMIND_SMOKE_KEY_MODE:-synthetic}"
 
 looks_like_external_secret() {
   local value="${1:-}"
@@ -19,11 +20,28 @@ looks_like_external_secret() {
   return 1
 }
 
-export INFINIMIND_API_KEY="${INFINIMIND_API_KEY:-ci-dev-token}"
-export INFINIMIND_ADMIN_API_KEY="${INFINIMIND_ADMIN_API_KEY:-ci-admin-token}"
+# Deterministic key mode avoids accidental dependence on caller shell state.
+# Set INFINIMIND_SMOKE_KEY_MODE=environment to intentionally use caller-provided
+# credentials/tokens for live-key smoke testing.
+case "${SMOKE_KEY_MODE}" in
+  synthetic)
+    export INFINIMIND_API_KEY="ci-dev-token"
+    export INFINIMIND_ADMIN_API_KEY="ci-admin-token"
+    export OPENAI_API_KEY=""
+    ;;
+  environment)
+    export INFINIMIND_API_KEY="${INFINIMIND_API_KEY:-ci-dev-token}"
+    export INFINIMIND_ADMIN_API_KEY="${INFINIMIND_ADMIN_API_KEY:-ci-admin-token}"
+    export OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+    ;;
+  *)
+    echo "Invalid INFINIMIND_SMOKE_KEY_MODE='${SMOKE_KEY_MODE}'. Use 'synthetic' or 'environment'." >&2
+    exit 2
+    ;;
+esac
+
 export INFINIMIND_EMBEDDING_PROVIDER="${INFINIMIND_EMBEDDING_PROVIDER:-mock}"
 export INFINIMIND_EMBEDDING_MODEL="${INFINIMIND_EMBEDDING_MODEL:-text-embedding-3-large}"
-export OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 ALLOW_REAL_KEYS="${INFINIMIND_ALLOW_REAL_KEYS:-0}"
 
 # CI and local smoke checks must avoid real provider credentials by default.

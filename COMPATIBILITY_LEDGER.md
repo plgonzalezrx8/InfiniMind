@@ -610,3 +610,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Consolidate required quality jobs into one canonical workflow so branch protection can require a stable set of gate names.
 - Impact:
   - Merge policy can now enforce service, bridge, contract, secret, docker-smoke, and OpenClaw E2E gates from a single deterministic workflow definition.
+
+## 2026-02-24 — Feature: `fix(scripts): deterministic smoke key handling without reducing safety`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+- Decision:
+  - Add explicit smoke key-source mode with deterministic synthetic defaults while preserving guardrails for real-looking external credentials.
+- Impact:
+  - Local and CI smoke runs are reproducible even when operator shells contain unrelated live keys, without weakening default secret-safety behavior.
