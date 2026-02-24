@@ -268,3 +268,38 @@ def test_recall_invalid_date_filters_return_422(client, auth_headers):
         headers=auth_headers,
     )
     assert inverted.status_code == 422
+
+
+def test_metadata_roundtrip_on_store_and_recall(client, auth_headers):
+    """Stored metadata should persist and be returned on recall responses."""
+
+    store = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "metadata-user",
+            "agent_id": "main",
+            "text": "Ticket INC-42 assigned to platform team.",
+            "category": "fact",
+            "metadata": {"ticket": "INC-42", "priority": 2, "source": "ops"},
+        },
+        headers=auth_headers,
+    )
+    assert store.status_code == 200
+
+    recall = client.post(
+        "/v1/memory/recall",
+        json={
+            "tenant_id": "default",
+            "user_id": "metadata-user",
+            "agent_id": "main",
+            "query": "INC-42",
+            "limit": 3,
+            "rerank": "hybrid",
+        },
+        headers=auth_headers,
+    )
+    assert recall.status_code == 200
+    body = recall.json()
+    assert body["count"] >= 1
+    assert body["memories"][0]["metadata"]["ticket"] == "INC-42"

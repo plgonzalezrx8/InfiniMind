@@ -101,6 +101,7 @@ class RecallItem(BaseModel):
     text: str
     category: str
     tags: list[str]
+    metadata: dict[str, Any] = Field(default_factory=dict)
     score: float
     importance: float
     scope: str

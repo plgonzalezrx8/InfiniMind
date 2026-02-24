@@ -14,7 +14,8 @@ from typing import Any
 from .memory_schema import MemoryRecord
 
 LOGGER = logging.getLogger(__name__)
-TABLE_NAME = "memories_v2"
+TABLE_NAME = "memories_v3"
+LEGACY_TABLE_NAME = "memories_v2"
 
 
 class LanceMemoryStore:
@@ -62,40 +63,83 @@ class LanceMemoryStore:
         table_names = set(self._db.table_names())
         if TABLE_NAME in table_names:
             self._table = self._db.open_table(TABLE_NAME)
+        elif LEGACY_TABLE_NAME in table_names:
+            self._table = self._migrate_v2_to_v3()
         else:
             # We bootstrap schema with a sentinel row and delete it immediately.
-            sentinel = {
-                "memory_id": "__schema__",
-                "schema_version": 2,
-                "tenant_id": "default",
-                "user_id": "default",
-                "agent_id": "main",
-                "text": "",
-                "category": "other",
-                "tags_json": "[]",
-                "importance": 0.0,
-                "scope": "user",
-                "sensitivity": "low",
-                "source_channel": None,
-                "source_session": None,
-                "source_actor": None,
-                "created_at": "1970-01-01T00:00:00+00:00",
-                "updated_at": "1970-01-01T00:00:00+00:00",
-                "ttl_expires_at": None,
-                "embedding_model_id": "bootstrap",
-                "content_hash": "bootstrap",
-                "dedupe_key": None,
-                "provenance_source_type": "chat",
-                "provenance_source_ref": None,
-                "quality_confidence": 0.0,
-                "quality_verification_status": "unverified",
-                "quality_conflict_set_json": "[]",
-                "vector": [0.0 for _ in range(self._vector_dim)],
-            }
+            sentinel = self._bootstrap_row_v3()
             self._table = self._db.create_table(TABLE_NAME, data=[sentinel])
             self._table.delete("memory_id = '__schema__'")
 
         self._create_indexes()
+
+    def _bootstrap_row_v3(self) -> dict[str, Any]:
+        """Return a sentinel row that defines the current schema shape."""
+
+        return {
+            "memory_id": "__schema__",
+            "schema_version": 3,
+            "tenant_id": "default",
+            "user_id": "default",
+            "agent_id": "main",
+            "text": "",
+            "category": "other",
+            "tags_json": "[]",
+            "importance": 0.0,
+            "scope": "user",
+            "sensitivity": "low",
+            "source_channel": None,
+            "source_session": None,
+            "source_actor": None,
+            "created_at": "1970-01-01T00:00:00+00:00",
+            "updated_at": "1970-01-01T00:00:00+00:00",
+            "ttl_expires_at": None,
+            "embedding_model_id": "bootstrap",
+            "content_hash": "bootstrap",
+            "dedupe_key": None,
+            "metadata_json": "{}",
+            "provenance_source_type": "chat",
+            "provenance_source_ref": None,
+            "quality_confidence": 0.0,
+            "quality_verification_status": "unverified",
+            "quality_conflict_set_json": "[]",
+            "vector": [0.0 for _ in range(self._vector_dim)],
+        }
+
+    def _query_results_to_rows(self, query: Any) -> list[dict[str, Any]]:
+        """Convert LanceDB query results into plain row dicts across API versions."""
+
+        to_list = getattr(query, "to_list", None)
+        if callable(to_list):
+            return to_list()
+
+        to_arrow = getattr(query, "to_arrow", None)
+        if callable(to_arrow):
+            return to_arrow().to_pylist()
+
+        return []
+
+    def _migrate_v2_to_v3(self):
+        """Create a v3 table from v2 rows and keep legacy table untouched."""
+
+        assert self._db is not None
+        legacy_table = self._db.open_table(LEGACY_TABLE_NAME)
+        legacy_rows = self._query_results_to_rows(legacy_table.search().limit(500_000))
+
+        migrated_rows: list[dict[str, Any]] = []
+        for row in legacy_rows:
+            copied = dict(row)
+            copied["schema_version"] = 3
+            copied["metadata_json"] = copied.get("metadata_json") or "{}"
+            migrated_rows.append(copied)
+
+        if not migrated_rows:
+            migrated_rows = [self._bootstrap_row_v3()]
+            table = self._db.create_table(TABLE_NAME, data=migrated_rows)
+            table.delete("memory_id = '__schema__'")
+            return table
+
+        return self._db.create_table(TABLE_NAME, data=migrated_rows)
 
     def is_ready(self) -> bool:
         """Return true once the underlying table is fully initialized."""
@@ -161,6 +205,7 @@ class LanceMemoryStore:
             "embedding_model_id": record.embedding_model_id,
             "content_hash": record.content_hash,
             "dedupe_key": record.dedupe_key,
+            "metadata_json": json.dumps(record.metadata),
             "provenance_source_type": record.provenance.source_type,
             "provenance_source_ref": record.provenance.source_ref,
             "quality_confidence": record.quality.confidence,
@@ -212,16 +257,7 @@ class LanceMemoryStore:
 
         # to_list exists on recent LanceDB builds. We keep a fallback path for
         # compatibility with older variants.
-        query = self._table.search().limit(limit)
-        to_list = getattr(query, "to_list", None)
-        if callable(to_list):
-            return to_list()
-
-        to_arrow = getattr(query, "to_arrow", None)
-        if callable(to_arrow):
-            return to_arrow().to_pylist()
-
-        return []
+        return self._query_results_to_rows(self._table.search().limit(limit))
 
     def vector_search(self, query_vector: list[float], limit: int = 20) -> list[dict[str, Any]]:
         """Run approximate vector similarity search against stored rows."""
@@ -246,16 +282,7 @@ class LanceMemoryStore:
 
         assert self._table is not None
 
-        query = self._table.search(query_vector).limit(limit)
-        to_list = getattr(query, "to_list", None)
-        if callable(to_list):
-            return to_list()
-
-        to_arrow = getattr(query, "to_arrow", None)
-        if callable(to_arrow):
-            return to_arrow().to_pylist()
-
-        return []
+        return self._query_results_to_rows(self._table.search(query_vector).limit(limit))
 
     def write_shadow_embeddings(
         self,

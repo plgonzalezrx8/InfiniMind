@@ -198,6 +198,7 @@ def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:
         embedding_model_id=settings.embedding_model,
         content_hash=content_hash,
         dedupe_key=payload.dedupe_key,
+        metadata=payload.metadata,
         provenance=payload.provenance,
         quality=payload.quality,
         vector=vector,
@@ -240,12 +241,14 @@ def _row_to_recall_item(
     """Convert a raw storage row into the public recall response shape."""
 
     tags = json.loads(row.get("tags_json") or "[]")
+    metadata = json.loads(row.get("metadata_json") or "{}")
     conflict_set = json.loads(row.get("quality_conflict_set_json") or "[]")
     return RecallItem(
         memory_id=str(row.get("memory_id")),
         text=str(row.get("text") or ""),
         category=str(row.get("category") or "other"),
         tags=tags,
+        metadata=metadata,
         score=score,
         importance=float(row.get("importance") or 0.0),
         scope=str(row.get("scope") or "user"),

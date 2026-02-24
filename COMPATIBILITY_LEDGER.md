@@ -256,3 +256,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Return early for zero-row re-embed jobs and avoid empty shadow-table writes.
 - Impact:
   - Admin re-embed endpoint now behaves deterministically on empty datasets without backend errors.
+
+## 2026-02-24 — Feature: `feat(storage): add metadata persistence with non-destructive schema v3 migration`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Introduce `memories_v3` with `metadata_json` and migrate from `memories_v2` in-place without deleting legacy data.
+- Impact:
+  - Metadata now round-trips through store/recall and existing v2 deployments can bootstrap forward safely.

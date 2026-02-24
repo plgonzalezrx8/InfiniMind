@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -51,7 +51,7 @@ class MemoryRecord(BaseModel):
     """Canonical memory object persisted in LanceDB."""
 
     memory_id: str = Field(default_factory=lambda: str(uuid4()))
-    schema_version: int = 2
+    schema_version: int = 3
     tenant_id: str = "default"
     user_id: str
     agent_id: str = "main"
@@ -70,6 +70,7 @@ class MemoryRecord(BaseModel):
     embedding_model_id: str
     content_hash: str
     dedupe_key: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     provenance: MemoryProvenance = Field(default_factory=MemoryProvenance)
     quality: MemoryQuality = Field(default_factory=MemoryQuality)
     vector: list[float]
