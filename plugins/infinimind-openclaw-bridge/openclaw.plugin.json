@@ -36,6 +36,16 @@
       "label": "Fallback Mode",
       "help": "Controls recall expansion behavior when strict filters return too few candidates",
       "advanced": true
+    },
+    "identityFallback": {
+      "label": "Identity Fallback",
+      "help": "Controls behavior when user identity is missing from tool input",
+      "advanced": true
+    },
+    "defaultUserId": {
+      "label": "Default User ID",
+      "help": "Used only when identityFallback=configured-default",
+      "advanced": true
     }
   },
   "configSchema": {
@@ -48,7 +58,9 @@
       "defaultScope": { "type": "string", "enum": ["global", "user", "channel", "session"] },
       "includeSensitiveDefault": { "type": "boolean" },
       "rerankDefault": { "type": "string", "enum": ["off", "hybrid"] },
-      "fallbackMode": { "type": "string", "enum": ["off", "legacy-compatible"] }
+      "fallbackMode": { "type": "string", "enum": ["off", "legacy-compatible"] },
+      "identityFallback": { "type": "string", "enum": ["error", "configured-default"] },
+      "defaultUserId": { "type": "string", "minLength": 1 }
     },
     "required": ["baseUrl", "apiKey"]
   }

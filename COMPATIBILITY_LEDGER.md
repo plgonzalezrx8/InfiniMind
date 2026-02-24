@@ -211,3 +211,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Align bridge package metadata with OpenClaw extension packaging conventions and add explicit typecheck tooling.
 - Impact:
   - Bridge package now installs successfully and can be validated deterministically before integration.
+
+## 2026-02-24 — Feature: `fix(bridge): enforce explicit identity resolution and remove implicit default-user`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/docs/tools/plugin.md
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/config.ts
+- Decision:
+  - Keep strict plugin config validation while requiring explicit identity resolution with optional configured fallback.
+- Impact:
+  - Bridge no longer silently collapses requests into a shared default user namespace.

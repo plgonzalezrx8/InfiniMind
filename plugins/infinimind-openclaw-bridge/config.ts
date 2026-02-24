@@ -6,6 +6,8 @@ export type BridgeConfig = {
   includeSensitiveDefault: boolean;
   rerankDefault: "off" | "hybrid";
   fallbackMode: "off" | "legacy-compatible";
+  identityFallback: "error" | "configured-default";
+  defaultUserId: string | null;
 };
 
 function assertAllowedKeys(value: Record<string, unknown>, allowed: string[], label: string) {
@@ -43,6 +45,8 @@ export const bridgeConfigSchema = {
         "includeSensitiveDefault",
         "rerankDefault",
         "fallbackMode",
+        "identityFallback",
+        "defaultUserId",
       ],
       "infinimind bridge config",
     );
@@ -70,6 +74,20 @@ export const bridgeConfigSchema = {
       typeof cfg.fallbackMode === "string"
         ? (cfg.fallbackMode as BridgeConfig["fallbackMode"])
         : "legacy-compatible";
+    const identityFallback =
+      typeof cfg.identityFallback === "string"
+        ? (cfg.identityFallback as BridgeConfig["identityFallback"])
+        : "error";
+    if (identityFallback !== "error" && identityFallback !== "configured-default") {
+      throw new Error("identityFallback must be one of: error, configured-default");
+    }
+    const defaultUserId =
+      typeof cfg.defaultUserId === "string" && cfg.defaultUserId.trim().length > 0
+        ? cfg.defaultUserId.trim()
+        : null;
+    if (identityFallback === "configured-default" && !defaultUserId) {
+      throw new Error("defaultUserId is required when identityFallback=configured-default");
+    }
 
     return {
       baseUrl: cfg.baseUrl.replace(/\/$/, ""),
@@ -79,6 +97,8 @@ export const bridgeConfigSchema = {
       includeSensitiveDefault: cfg.includeSensitiveDefault === true,
       rerankDefault,
       fallbackMode,
+      identityFallback,
+      defaultUserId,
     };
   },
   uiHints: {
@@ -115,6 +135,16 @@ export const bridgeConfigSchema = {
     fallbackMode: {
       label: "Fallback Mode",
       help: "Controls recall expansion behavior when strict filters return too few candidates",
+      advanced: true,
+    },
+    identityFallback: {
+      label: "Identity Fallback",
+      help: "Controls behavior when user identity is missing from tool input",
+      advanced: true,
+    },
+    defaultUserId: {
+      label: "Default User ID",
+      help: "Used only when identityFallback=configured-default",
       advanced: true,
     },
   },

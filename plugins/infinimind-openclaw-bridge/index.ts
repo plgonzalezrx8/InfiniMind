@@ -26,6 +26,27 @@ type RecallResponse = {
 
 const MEMORY_CATEGORIES = ["preference", "fact", "decision", "entity", "other"] as const;
 
+function resolveUserIdFromParams(
+  params: Record<string, unknown>,
+  cfg: { identityFallback: "error" | "configured-default"; defaultUserId: string | null },
+): string {
+  const candidates = ["userId", "actorId", "sessionId", "channelId"] as const;
+  for (const key of candidates) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  if (cfg.identityFallback === "configured-default" && cfg.defaultUserId) {
+    return cfg.defaultUserId;
+  }
+
+  throw new Error(
+    "Identity is required. Provide one of userId, actorId, sessionId, channelId or configure identityFallback=configured-default with defaultUserId.",
+  );
+}
+
 const infinimindBridgePlugin = {
   id: "infinimind-bridge",
   name: "InfiniMind Bridge",
@@ -68,9 +89,10 @@ const infinimindBridgePlugin = {
         }),
         async execute(_toolCallId, params) {
           const p = params as Record<string, unknown>;
+          const resolvedUserId = resolveUserIdFromParams(p, cfg);
           const payload = {
             tenant_id: typeof p.tenantId === "string" ? p.tenantId : "default",
-            user_id: typeof p.userId === "string" ? p.userId : "default-user",
+            user_id: resolvedUserId,
             agent_id: typeof p.agentId === "string" ? p.agentId : "main",
             text: p.text,
             importance: typeof p.importance === "number" ? p.importance : 0.7,
@@ -140,9 +162,10 @@ const infinimindBridgePlugin = {
         }),
         async execute(_toolCallId, params) {
           const p = params as Record<string, unknown>;
+          const resolvedUserId = resolveUserIdFromParams(p, cfg);
           const payload = {
             tenant_id: typeof p.tenantId === "string" ? p.tenantId : "default",
-            user_id: typeof p.userId === "string" ? p.userId : "default-user",
+            user_id: resolvedUserId,
             agent_id: typeof p.agentId === "string" ? p.agentId : "main",
             query: p.query,
             limit: typeof p.limit === "number" ? p.limit : 5,
