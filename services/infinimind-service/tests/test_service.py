@@ -143,3 +143,82 @@ def test_metrics_endpoint(client):
     metrics = client.get("/v1/metrics")
     assert metrics.status_code == 200
     assert "infinimind_http_requests_total" in metrics.text
+
+
+def test_forget_endpoint_paths(client, auth_headers):
+    """Forget endpoint should cover missing params, candidates, delete, and not-found paths."""
+
+    first = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "forget-user",
+            "agent_id": "main",
+            "text": "Remember deployment playbook owner is Alice.",
+            "category": "fact",
+        },
+        headers=auth_headers,
+    )
+    second = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "forget-user",
+            "agent_id": "main",
+            "text": "Remember deployment playbook owner is Bob.",
+            "category": "fact",
+        },
+        headers=auth_headers,
+    )
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_id = first.json()["memory_id"]
+
+    missing = client.post(
+        "/v1/memory/forget",
+        json={"tenant_id": "default", "user_id": "forget-user", "agent_id": "main"},
+        headers=auth_headers,
+    )
+    assert missing.status_code == 200
+    assert missing.json()["action"] == "missing_param"
+
+    candidates = client.post(
+        "/v1/memory/forget",
+        json={
+            "tenant_id": "default",
+            "user_id": "forget-user",
+            "agent_id": "main",
+            "query": "deployment playbook owner",
+        },
+        headers=auth_headers,
+    )
+    assert candidates.status_code == 200
+    candidates_body = candidates.json()
+    assert candidates_body["action"] == "candidates"
+    assert candidates_body["found"] >= 2
+
+    deleted = client.post(
+        "/v1/memory/forget",
+        json={
+            "tenant_id": "default",
+            "user_id": "forget-user",
+            "agent_id": "main",
+            "memory_id": first_id,
+        },
+        headers=auth_headers,
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["action"] == "deleted"
+
+    not_found = client.post(
+        "/v1/memory/forget",
+        json={
+            "tenant_id": "default",
+            "user_id": "forget-user",
+            "agent_id": "main",
+            "memory_id": first_id,
+        },
+        headers=auth_headers,
+    )
+    assert not_found.status_code == 200
+    assert not_found.json()["action"] == "not_found"

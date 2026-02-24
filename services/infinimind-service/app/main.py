@@ -11,6 +11,9 @@ from fastapi import Depends, FastAPI
 from .api_models import (
     BatchStoreRequest,
     BatchStoreResponse,
+    ForgetCandidate,
+    ForgetRequest,
+    ForgetResponse,
     ReembedRequest,
     ReembedResponse,
     RecallDebug,
@@ -331,3 +334,62 @@ def recall(payload: RecallRequest) -> RecallResponse:
         )
 
     return RecallResponse(count=len(items), memories=items, debug=debug)
+
+
+@app.post("/v1/memory/forget", response_model=ForgetResponse, dependencies=[Depends(require_api_key)])
+def forget(payload: ForgetRequest) -> ForgetResponse:
+    """Delete memories by ID or return deletion candidates from semantic query search."""
+
+    if payload.memory_id:
+        deleted = app.state.memory_store.delete_memory(
+            tenant_id=payload.tenant_id,
+            user_id=payload.user_id,
+            agent_id=payload.agent_id,
+            memory_id=payload.memory_id,
+        )
+        if deleted:
+            return ForgetResponse(action="deleted", memory_id=payload.memory_id)
+        return ForgetResponse(action="not_found", found=0)
+
+    if payload.query:
+        rows = app.state.memory_store.scoped_memories(
+            tenant_id=payload.tenant_id,
+            user_id=payload.user_id,
+            agent_id=payload.agent_id,
+            limit=5000,
+        )
+        if not rows:
+            return ForgetResponse(action="not_found", found=0)
+
+        ranked = hybrid_rank(
+            rows,
+            query=payload.query,
+            query_vector=app.state.embedding_client.embed(payload.query),
+            limit=payload.limit,
+        )
+        if not ranked:
+            return ForgetResponse(action="not_found", found=0)
+
+        if len(ranked) == 1 and float(ranked[0]["score"]) > 0.90:
+            candidate_id = str(ranked[0]["row"].get("memory_id"))
+            deleted = app.state.memory_store.delete_memory(
+                tenant_id=payload.tenant_id,
+                user_id=payload.user_id,
+                agent_id=payload.agent_id,
+                memory_id=candidate_id,
+            )
+            if deleted:
+                return ForgetResponse(action="deleted", memory_id=candidate_id)
+
+        candidates = [
+            ForgetCandidate(
+                memory_id=str(item["row"].get("memory_id")),
+                text=str(item["row"].get("text") or ""),
+                category=str(item["row"].get("category") or "other"),
+                score=float(item["score"]),
+            )
+            for item in ranked
+        ]
+        return ForgetResponse(action="candidates", found=len(candidates), candidates=candidates)
+
+    return ForgetResponse(action="missing_param")

@@ -286,3 +286,55 @@ class LanceMemoryStore:
         assert self._db is not None
         self._db.create_table(table_name, data=shadow_rows)
         return table_name
+
+    def scoped_memories(self, *, tenant_id: str, user_id: str, agent_id: str, limit: int = 5000) -> list[dict[str, Any]]:
+        """Return rows constrained to one tenant/user/agent boundary."""
+
+        rows = self.list_memories(limit=limit)
+        return [
+            row
+            for row in rows
+            if row.get("tenant_id") == tenant_id
+            and row.get("user_id") == user_id
+            and row.get("agent_id") == agent_id
+        ]
+
+    def delete_memory(self, *, tenant_id: str, user_id: str, agent_id: str, memory_id: str) -> bool:
+        """Delete one scoped memory row and return whether a row was removed."""
+
+        self.ensure_initialized()
+        scoped = self.scoped_memories(tenant_id=tenant_id, user_id=user_id, agent_id=agent_id, limit=5000)
+        exists = any(str(row.get("memory_id")) == memory_id for row in scoped)
+        if not exists:
+            return False
+
+        if self._in_memory_mode:
+            self._rows = [
+                row
+                for row in self._rows
+                if not (
+                    str(row.get("memory_id")) == memory_id
+                    and row.get("tenant_id") == tenant_id
+                    and row.get("user_id") == user_id
+                    and row.get("agent_id") == agent_id
+                )
+            ]
+            return True
+
+        assert self._table is not None
+        # Escape single quotes to keep filter expression safe for the current SQL-like API.
+        safe_memory_id = memory_id.replace("'", "''")
+        safe_tenant_id = tenant_id.replace("'", "''")
+        safe_user_id = user_id.replace("'", "''")
+        safe_agent_id = agent_id.replace("'", "''")
+        self._table.delete(
+            " and ".join(
+                [
+                    f"memory_id = '{safe_memory_id}'",
+                    f"tenant_id = '{safe_tenant_id}'",
+                    f"user_id = '{safe_user_id}'",
+                    f"agent_id = '{safe_agent_id}'",
+                ]
+            )
+        )
+        return True

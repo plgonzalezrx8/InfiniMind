@@ -220,3 +220,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Keep strict plugin config validation while requiring explicit identity resolution with optional configured fallback.
 - Impact:
   - Bridge no longer silently collapses requests into a shared default user namespace.
+
+## 2026-02-24 — Feature: `feat(service): add memory forget endpoint and scoped delete behavior`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/index.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory.md
+- Decision:
+  - Add service-side forget semantics aligned with memory-lancedb behavior while enforcing tenant/user/agent boundaries.
+- Impact:
+  - Bridge can now support delete and candidate-forget workflows without modifying OpenClaw core.

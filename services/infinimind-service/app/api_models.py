@@ -124,6 +124,35 @@ class RecallResponse(BaseModel):
     debug: RecallDebug | None = None
 
 
+class ForgetRequest(BaseModel):
+    """Payload for deleting a memory directly or resolving candidates from a query."""
+
+    tenant_id: str = "default"
+    user_id: str
+    agent_id: str = "main"
+    memory_id: str | None = None
+    query: str | None = None
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class ForgetCandidate(BaseModel):
+    """Candidate memory row returned when delete intent is ambiguous."""
+
+    memory_id: str
+    text: str
+    category: str
+    score: float
+
+
+class ForgetResponse(BaseModel):
+    """Response payload for memory forget operations."""
+
+    action: Literal["deleted", "candidates", "not_found", "missing_param"]
+    memory_id: str | None = None
+    found: int | None = None
+    candidates: list[ForgetCandidate] = Field(default_factory=list)
+
+
 class ReembedRequest(BaseModel):
     """Admin request payload for shadow re-embedding operations."""
 
