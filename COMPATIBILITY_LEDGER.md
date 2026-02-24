@@ -660,3 +660,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Finalize beta-readiness reporting with explicit gate outcomes, dependency-security posture, and environment-qualified heavy-gate constraints.
 - Impact:
   - Release evidence is consolidated in one operator-facing report, with auditable confirmation of quality/security checks and OpenClaw compatibility assumptions.
+
+## 2026-02-24 — Feature: `fix(smoke): stabilize docker smoke gate startup and JSON parsing`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+- Decision:
+  - Harden smoke startup checks to wait for both health and authenticated readiness, and fix JSON assertion parsing to avoid heredoc/herestring stdin conflicts.
+- Impact:
+  - Docker smoke gate no longer fails with transient connection-reset startup races or Python `NameError` parsing failures on JSON `null` values.

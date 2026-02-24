@@ -65,21 +65,25 @@ fi
 
 docker compose -f "${COMPOSE_FILE}" up -d --build
 
+# Wait for both liveness and authenticated readiness so smoke assertions do not
+# race startup transitions (for example, brief restarts during container boot).
 for i in $(seq 1 60); do
-  if curl -fsS "${BASE_URL}/v1/health" >/dev/null; then
+  if \
+    curl -fsS "${BASE_URL}/v1/health" >/dev/null \
+    && curl -fsS -H "Authorization: Bearer ${INFINIMIND_API_KEY}" "${BASE_URL}/v1/ready" >/dev/null
+  then
     break
   fi
 
   if [[ "${i}" -eq 60 ]]; then
     docker logs infinimind-service || true
-    echo "Service health check timed out." >&2
+    echo "Service health/readiness checks timed out." >&2
     exit 1
   fi
 
   sleep 2
 done
 
-curl -fsS -H "Authorization: Bearer ${INFINIMIND_API_KEY}" "${BASE_URL}/v1/ready" >/dev/null
 curl -fsS "${BASE_URL}/v1/metrics" >/dev/null
 
 store_response="$(curl -fsS \
@@ -88,11 +92,13 @@ store_response="$(curl -fsS \
   -X POST "${BASE_URL}/v1/memory/store" \
   -d '{"tenant_id":"default","user_id":"ci-user","agent_id":"main","text":"CI smoke memory record for store/recall/forget.","category":"fact"}')"
 
-memory_id="$(python3 - <<'PY' <<<"${store_response}"
+# Use environment variables for JSON parsing so Python receives code via stdin
+# and payload via env, avoiding heredoc+herestring descriptor conflicts.
+memory_id="$(STORE_RESPONSE="${store_response}" python3 - <<'PY'
 import json
-import sys
+import os
 
-payload = json.load(sys.stdin)
+payload = json.loads(os.environ["STORE_RESPONSE"])
 memory_id = payload.get("memory_id")
 if not memory_id:
     raise SystemExit("store response missing memory_id")
@@ -106,11 +112,11 @@ recall_response="$(curl -fsS \
   -X POST "${BASE_URL}/v1/memory/recall" \
   -d '{"tenant_id":"default","user_id":"ci-user","agent_id":"main","query":"CI smoke memory record","limit":3,"rerank":"hybrid"}')"
 
-python3 - <<'PY' <<<"${recall_response}"
+RECALL_RESPONSE="${recall_response}" python3 - <<'PY'
 import json
-import sys
+import os
 
-payload = json.load(sys.stdin)
+payload = json.loads(os.environ["RECALL_RESPONSE"])
 if int(payload.get("count", 0)) < 1:
     raise SystemExit("recall response count < 1")
 PY
@@ -121,11 +127,11 @@ forget_response="$(curl -fsS \
   -X POST "${BASE_URL}/v1/memory/forget" \
   -d "{\"tenant_id\":\"default\",\"user_id\":\"ci-user\",\"agent_id\":\"main\",\"memory_id\":\"${memory_id}\"}")"
 
-python3 - <<'PY' <<<"${forget_response}"
+FORGET_RESPONSE="${forget_response}" python3 - <<'PY'
 import json
-import sys
+import os
 
-payload = json.load(sys.stdin)
+payload = json.loads(os.environ["FORGET_RESPONSE"])
 if payload.get("action") != "deleted":
     raise SystemExit(f"forget action was not deleted: {payload}")
 PY
