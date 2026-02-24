@@ -10,6 +10,10 @@ export type BridgeConfig = {
   defaultUserId: string | null;
 };
 
+const DEFAULT_SCOPES = ["global", "user", "channel", "session"] as const;
+const RERANK_MODES = ["off", "hybrid"] as const;
+const FALLBACK_MODES = ["off", "legacy-compatible"] as const;
+
 function assertAllowedKeys(value: Record<string, unknown>, allowed: string[], label: string) {
   const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
   if (unknown.length === 0) {
@@ -68,12 +72,23 @@ export const bridgeConfigSchema = {
 
     const defaultScope =
       typeof cfg.defaultScope === "string" ? (cfg.defaultScope as BridgeConfig["defaultScope"]) : "user";
+    if (!DEFAULT_SCOPES.includes(defaultScope)) {
+      throw new Error(`defaultScope must be one of: ${DEFAULT_SCOPES.join(", ")}`);
+    }
+
     const rerankDefault =
       typeof cfg.rerankDefault === "string" ? (cfg.rerankDefault as BridgeConfig["rerankDefault"]) : "hybrid";
+    if (!RERANK_MODES.includes(rerankDefault)) {
+      throw new Error(`rerankDefault must be one of: ${RERANK_MODES.join(", ")}`);
+    }
+
     const fallbackMode =
       typeof cfg.fallbackMode === "string"
         ? (cfg.fallbackMode as BridgeConfig["fallbackMode"])
         : "legacy-compatible";
+    if (!FALLBACK_MODES.includes(fallbackMode)) {
+      throw new Error(`fallbackMode must be one of: ${FALLBACK_MODES.join(", ")}`);
+    }
     const identityFallback =
       typeof cfg.identityFallback === "string"
         ? (cfg.identityFallback as BridgeConfig["identityFallback"])

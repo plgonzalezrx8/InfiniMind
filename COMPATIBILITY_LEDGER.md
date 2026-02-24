@@ -400,3 +400,12 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Treat malformed list-like recall payload fields (`tags_json`, `quality_conflict_set_json`) as non-fatal and normalize them to empty lists with scoped warnings.
 - Impact:
   - Corrupt row JSON no longer causes recall-time crashes or invalid response shapes.
+
+## 2026-02-24 — Feature: `fix(bridge): enforce runtime enum validation and pin OpenClaw dev dependency`
+- Sources consulted:
+  - https://github.com/openclaw/openclaw/blob/main/extensions/memory-lancedb/config.ts
+  - https://github.com/openclaw/openclaw/blob/main/docs/plugins/manifest.md
+- Decision:
+  - Mirror strict config parsing for enum-backed settings and pin bridge OpenClaw dependency to the tested version.
+- Impact:
+  - Bridge startup behavior is deterministic across installs and rejects invalid enum values before runtime calls.
