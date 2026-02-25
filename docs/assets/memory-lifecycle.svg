@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="520" viewBox="0 0 1400 520" role="img" aria-label="InfiniMind memory lifecycle">
+  <defs>
+    <style>
+      .title{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:24px;font-weight:700;fill:#0f172a}
+      .actor{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600;fill:#0f172a}
+      .line{stroke:#94a3b8;stroke-width:2}
+      .msg{stroke:#334155;stroke-width:2.2;fill:none;marker-end:url(#arrow)}
+      .txt{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;fill:#0f172a}
+      .note{fill:#f8fafc;stroke:#cbd5e1;stroke-width:1.5;rx:8;ry:8}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#334155"/>
+    </marker>
+  </defs>
+  <text x="40" y="40" class="title">InfiniMind Memory Lifecycle</text>
+
+  <text x="90" y="85" class="actor">User/Agent</text>
+  <text x="320" y="85" class="actor">OpenClaw</text>
+  <text x="560" y="85" class="actor">Bridge</text>
+  <text x="800" y="85" class="actor">Service</text>
+  <text x="1070" y="85" class="actor">LanceDB</text>
+
+  <line x1="120" y1="100" x2="120" y2="480" class="line"/>
+  <line x1="350" y1="100" x2="350" y2="480" class="line"/>
+  <line x1="590" y1="100" x2="590" y2="480" class="line"/>
+  <line x1="840" y1="100" x2="840" y2="480" class="line"/>
+  <line x1="1110" y1="100" x2="1110" y2="480" class="line"/>
+
+  <path class="msg" d="M120 140 L350 140"/><text x="155" y="132" class="txt">memory_store(text, metadata)</text>
+  <path class="msg" d="M350 175 L590 175"/><text x="410" y="168" class="txt">tool payload</text>
+  <path class="msg" d="M590 210 L840 210"/><text x="655" y="202" class="txt">auth HTTP request</text>
+  <rect x="760" y="225" width="170" height="38" class="note"/><text x="772" y="248" class="txt">policy + metadata normalize</text>
+  <path class="msg" d="M840 285 L1110 285"/><text x="908" y="278" class="txt">write memory</text>
+  <path class="msg" d="M1110 320 L840 320"/><text x="950" y="313" class="txt">memory_id</text>
+  <path class="msg" d="M840 355 L590 355"/><text x="670" y="347" class="txt">store result</text>
+  <path class="msg" d="M590 390 L350 390"/><text x="450" y="382" class="txt">OpenClaw response</text>
+
+  <path class="msg" d="M120 430 L350 430"/><text x="170" y="423" class="txt">memory_recall(query)</text>
+  <path class="msg" d="M350 460 L590 460"/>
+  <path class="msg" d="M590 490 L840 490"/>
+</svg>

@@ -74,76 +74,19 @@ Working MVP on branch `codex/infinimind-mvp` with:
 
 ### End-to-end request flow
 
-```mermaid
-flowchart LR
-    A[OpenClaw Memory Tool Call\nmemory_store/recall/forget/search] --> B[infinimind-openclaw-bridge]
-    B --> C{Policy + Identity\nvalidation}
-    C --> D[infinimind-service API]
-    D --> E[(LanceDB\nmemories_v3)]
-    D --> F[Ranking + Filtering\nHybrid recall + TTL/scope checks]
-    F --> B
-    B --> G[OpenClaw-compatible\nresponse payload]
-```
+![InfiniMind end-to-end request flow](docs/assets/flow-end-to-end.svg)
 
 ### Runtime topology (Docker-first)
 
-```mermaid
-flowchart TB
-    subgraph Host[Mac mini / Linux host]
-      OC[OpenClaw runtime]
-      BR[Bridge plugin package]
-      DC[docker compose]
-    end
-
-    subgraph Containers[Docker services]
-      IM[infinimind-service:8080]
-      LD[(Persistent volume\n/var/lib/infinimind)]
-    end
-
-    OC --> BR
-    BR --> IM
-    DC --> IM
-    IM --> LD
-```
+![InfiniMind runtime topology](docs/assets/runtime-topology.svg)
 
 ### Memory lifecycle
 
-```mermaid
-sequenceDiagram
-    participant U as User/Agent
-    participant O as OpenClaw
-    participant B as Bridge
-    participant S as InfiniMind Service
-    participant DB as LanceDB
-
-    U->>O: memory_store(text, metadata)
-    O->>B: tool call payload
-    B->>S: authenticated HTTP request
-    S->>S: enforce policy + normalize metadata
-    S->>DB: write memory record
-    DB-->>S: memory_id
-    S-->>B: store result
-    B-->>O: OpenClaw response
-
-    U->>O: memory_recall(query)
-    O->>B: recall payload
-    B->>S: authenticated request
-    S->>DB: fetch candidates
-    S->>S: hybrid rank + policy filter
-    S-->>B: ranked memories
-    B-->>O: response
-```
+![InfiniMind memory lifecycle](docs/assets/memory-lifecycle.svg)
 
 ### MVP capability mix
 
-```mermaid
-pie showData title InfiniMind MVP Capability Focus
-    "Policy-filtered memory retrieval" : 30
-    "Bridge/OpenClaw compatibility" : 25
-    "Storage + migration safety" : 20
-    "Observability + CI gates" : 15
-    "Admin/ops workflows" : 10
-```
+![InfiniMind MVP capability mix](docs/assets/mvp-capability-mix.svg)
 
 > Why these visuals matter: InfiniMind is not "just a vector DB". It is a compatibility-preserving memory sidecar with policy enforcement, migration safety, and operational guardrails built in.
 

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="340" viewBox="0 0 1400 340" role="img" aria-label="InfiniMind end-to-end request flow">
+  <defs>
+    <style>
+      .box{fill:#f8fafc;stroke:#334155;stroke-width:2;rx:14;ry:14}
+      .diamond{fill:#eef2ff;stroke:#3730a3;stroke-width:2}
+      .txt{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:18px;fill:#0f172a}
+      .sub{font-size:14px;fill:#334155}
+      .arr{stroke:#475569;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+      .title{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:24px;font-weight:700;fill:#0f172a}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <text x="40" y="42" class="title">InfiniMind End-to-End Request Flow</text>
+
+  <rect class="box" x="40" y="100" width="230" height="120"/>
+  <text class="txt" x="62" y="145">OpenClaw memory</text>
+  <text class="sub" x="62" y="170">store / recall / forget / search</text>
+
+  <rect class="box" x="330" y="100" width="220" height="120"/>
+  <text class="txt" x="354" y="145">Bridge Plugin</text>
+  <text class="sub" x="354" y="170">infinimind-openclaw-bridge</text>
+
+  <polygon class="diamond" points="650,100 760,160 650,220 540,160"/>
+  <text class="txt" x="590" y="154">Policy +</text>
+  <text class="txt" x="580" y="178">Identity checks</text>
+
+  <rect class="box" x="820" y="100" width="220" height="120"/>
+  <text class="txt" x="844" y="145">InfiniMind Service</text>
+  <text class="sub" x="844" y="170">FastAPI + ranking/filter</text>
+
+  <rect class="box" x="1110" y="100" width="250" height="120"/>
+  <text class="txt" x="1135" y="145">LanceDB memories_v3</text>
+  <text class="sub" x="1135" y="170">persistent memory store</text>
+
+  <path class="arr" d="M270 160 L330 160"/>
+  <path class="arr" d="M550 160 L540 160"/>
+  <path class="arr" d="M760 160 L820 160"/>
+  <path class="arr" d="M1040 160 L1110 160"/>
+  <path class="arr" d="M1110 190 L1040 190"/>
+  <path class="arr" d="M820 190 L760 190"/>
+  <path class="arr" d="M540 190 L550 190"/>
+  <path class="arr" d="M330 190 L270 190"/>
+</svg>

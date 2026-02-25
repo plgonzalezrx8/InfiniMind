@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="InfiniMind runtime topology">
+  <defs>
+    <style>
+      .frame{fill:#ffffff;stroke:#1e293b;stroke-width:2;rx:16;ry:16}
+      .subframe{fill:#f8fafc;stroke:#94a3b8;stroke-width:2;rx:14;ry:14}
+      .node{fill:#eef2ff;stroke:#4f46e5;stroke-width:2;rx:12;ry:12}
+      .store{fill:#ecfeff;stroke:#0e7490;stroke-width:2;rx:12;ry:12}
+      .txt{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:18px;fill:#0f172a}
+      .small{font-size:14px;fill:#334155}
+      .title{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:24px;font-weight:700;fill:#0f172a}
+      .arr{stroke:#475569;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="42" class="title">InfiniMind Runtime Topology (Docker-first)</text>
+
+  <rect class="frame" x="30" y="70" width="1140" height="420"/>
+
+  <rect class="subframe" x="70" y="110" width="500" height="340"/>
+  <text x="90" y="145" class="txt">Host Runtime</text>
+
+  <rect class="node" x="95" y="180" width="180" height="90"/>
+  <text x="120" y="225" class="txt">OpenClaw</text>
+
+  <rect class="node" x="315" y="180" width="220" height="90"/>
+  <text x="345" y="225" class="txt">Bridge Plugin</text>
+
+  <rect class="node" x="180" y="305" width="220" height="90"/>
+  <text x="215" y="350" class="txt">docker compose</text>
+
+  <rect class="subframe" x="620" y="110" width="500" height="340"/>
+  <text x="640" y="145" class="txt">Docker Services</text>
+
+  <rect class="node" x="660" y="180" width="230" height="90"/>
+  <text x="685" y="225" class="txt">infinimind-service</text>
+  <text x="730" y="247" class="small">:8080</text>
+
+  <rect class="store" x="930" y="180" width="160" height="90"/>
+  <text x="955" y="225" class="txt">LanceDB</text>
+
+  <path class="arr" d="M275 225 L315 225"/>
+  <path class="arr" d="M535 225 L660 225"/>
+  <path class="arr" d="M400 350 L660 260"/>
+  <path class="arr" d="M890 225 L930 225"/>
+  <path class="arr" d="M930 250 L890 250"/>
+</svg>
