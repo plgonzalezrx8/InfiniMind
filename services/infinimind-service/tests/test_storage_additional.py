@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from app.memory_schema import MemoryRecord
 from app.storage import LanceMemoryStore
 
@@ -212,3 +214,78 @@ def test_vector_and_shadow_paths_for_db_mode(tmp_path):
     )
     assert shadow is not None
     assert shadow in store._db.created
+
+
+def test_schema_repair_fixes_null_typed_optional_columns(tmp_path):
+    """Store bootstrap should repair null-typed optional columns before writes."""
+
+    lancedb = pytest.importorskip("lancedb")
+
+    db_path = tmp_path / "lancedb"
+    db = lancedb.connect(str(db_path))
+
+    # Recreate the historical bad bootstrap shape where optional columns were
+    # inferred as Arrow `null`, which rejects later non-null inserts.
+    db.create_table(
+        "memories_v3",
+        data=[
+            {
+                "memory_id": "__schema__",
+                "schema_version": 3,
+                "tenant_id": "default",
+                "user_id": "default",
+                "agent_id": "main",
+                "text": "",
+                "category": "other",
+                "tags_json": "[]",
+                "importance": 0.0,
+                "scope": "user",
+                "sensitivity": "low",
+                "source_channel": None,
+                "source_session": None,
+                "source_actor": None,
+                "created_at": "1970-01-01T00:00:00+00:00",
+                "updated_at": "1970-01-01T00:00:00+00:00",
+                "ttl_expires_at": None,
+                "embedding_model_id": "bootstrap",
+                "content_hash": "bootstrap",
+                "dedupe_key": None,
+                "metadata_json": "{}",
+                "provenance_source_type": "chat",
+                "provenance_source_ref": None,
+                "quality_confidence": 0.0,
+                "quality_verification_status": "unverified",
+                "quality_conflict_set_json": "[]",
+                "vector": [0.0, 0.0, 0.0, 0.0],
+            }
+        ],
+    ).delete("memory_id = '__schema__'")
+
+    store = LanceMemoryStore(db_path=db_path, vector_dim=4)
+    store.ensure_initialized()
+
+    schema_types = {field.name: str(field.type) for field in store._table.schema}
+    assert schema_types["source_channel"] == "string"
+    assert schema_types["source_session"] == "string"
+    assert schema_types["source_actor"] == "string"
+    assert schema_types["ttl_expires_at"] == "string"
+    assert schema_types["dedupe_key"] == "string"
+    assert schema_types["provenance_source_ref"] == "string"
+
+    stored = store.store_memory(
+        _memory_record(
+            memory_id="post-repair",
+            source_channel="telegram:1387887369",
+            source_session="session-1",
+            source_actor="actor-1",
+            dedupe_key="dedupe-1",
+        )
+    )
+    assert stored.memory_id == "post-repair"
+
+    rows = store.list_all_memories()
+    match = next(row for row in rows if row.get("memory_id") == "post-repair")
+    assert match["source_channel"] == "telegram:1387887369"
+    assert match["source_session"] == "session-1"
+    assert match["source_actor"] == "actor-1"
+    assert match["dedupe_key"] == "dedupe-1"

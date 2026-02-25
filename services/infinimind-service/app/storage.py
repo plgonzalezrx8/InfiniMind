@@ -17,6 +17,18 @@ LOGGER = logging.getLogger(__name__)
 TABLE_NAME = "memories_v3"
 LEGACY_TABLE_NAME = "memories_v2"
 MIGRATION_BATCH_SIZE = 10_000
+SCHEMA_FIX_BACKUP_TABLE_NAME = f"{TABLE_NAME}__schema_fix_backup"
+
+# These fields are semantically optional strings. If the bootstrap row uses
+# nulls, Lance/Arrow can infer a `null`-typed column that rejects later strings.
+OPTIONAL_STRING_FIELDS = (
+    "source_channel",
+    "source_session",
+    "source_actor",
+    "ttl_expires_at",
+    "dedupe_key",
+    "provenance_source_ref",
+)
 
 
 class LanceMemoryStore:
@@ -72,6 +84,8 @@ class LanceMemoryStore:
             self._table = self._db.create_table(TABLE_NAME, data=[sentinel])
             self._table.delete("memory_id = '__schema__'")
 
+        # Self-heal legacy/null-inferred optional columns before accepting writes.
+        self._repair_null_typed_optional_columns()
         self._create_indexes()
 
     def _bootstrap_row_v3(self) -> dict[str, Any]:
@@ -89,23 +103,93 @@ class LanceMemoryStore:
             "importance": 0.0,
             "scope": "user",
             "sensitivity": "low",
-            "source_channel": None,
-            "source_session": None,
-            "source_actor": None,
+            # Optional text fields intentionally use empty strings in the
+            # sentinel row so Arrow infers `string` instead of `null`.
+            "source_channel": "",
+            "source_session": "",
+            "source_actor": "",
             "created_at": "1970-01-01T00:00:00+00:00",
             "updated_at": "1970-01-01T00:00:00+00:00",
-            "ttl_expires_at": None,
+            "ttl_expires_at": "",
             "embedding_model_id": "bootstrap",
             "content_hash": "bootstrap",
-            "dedupe_key": None,
+            "dedupe_key": "",
             "metadata_json": "{}",
             "provenance_source_type": "chat",
-            "provenance_source_ref": None,
+            "provenance_source_ref": "",
             "quality_confidence": 0.0,
             "quality_verification_status": "unverified",
             "quality_conflict_set_json": "[]",
             "vector": [0.0 for _ in range(self._vector_dim)],
         }
+
+    def _detect_null_typed_optional_fields(self) -> list[str]:
+        """Return optional string fields currently typed as Arrow `null`.
+
+        A `null` column accepts only null values, which causes runtime 500s when
+        callers provide valid strings (for example channel_id on memory_store).
+        """
+
+        if self._table is None:
+            return []
+        schema = getattr(self._table, "schema", None)
+        if schema is None:
+            return []
+
+        null_typed: list[str] = []
+        for field in schema:
+            if field.name in OPTIONAL_STRING_FIELDS and str(field.type) == "null":
+                null_typed.append(field.name)
+        return null_typed
+
+    def _repair_null_typed_optional_columns(self) -> None:
+        """Rebuild table schema when optional string columns were inferred as null.
+
+        The repair is deterministic and preserves rows:
+        1) snapshot current rows into a backup table,
+        2) recreate the active table with corrected inferred types,
+        3) reinsert rows in deterministic batches.
+        """
+
+        if self._table is None or self._db is None:
+            return
+        null_typed_fields = self._detect_null_typed_optional_fields()
+        if len(null_typed_fields) == 0:
+            return
+
+        LOGGER.warning(
+            "Repairing null-typed optional columns in %s: %s",
+            TABLE_NAME,
+            ", ".join(sorted(null_typed_fields)),
+        )
+
+        source_rows = self._table_scan_rows(self._table, limit=None)
+        self._db.drop_table(SCHEMA_FIX_BACKUP_TABLE_NAME, ignore_missing=True)
+
+        # Persist a full backup snapshot before replacing the active table.
+        if len(source_rows) > 0:
+            self._db.create_table(SCHEMA_FIX_BACKUP_TABLE_NAME, data=source_rows, mode="overwrite")
+
+        try:
+            # Recreate the active table with corrected inferred types.
+            repaired_table = self._db.create_table(TABLE_NAME, data=[self._bootstrap_row_v3()], mode="overwrite")
+            repaired_table.delete("memory_id = '__schema__'")
+            if len(source_rows) > 0:
+                for start in range(0, len(source_rows), MIGRATION_BATCH_SIZE):
+                    batch = source_rows[start : start + MIGRATION_BATCH_SIZE]
+                    repaired_table.add(batch)
+        except Exception:
+            # If rebuild fails, restore original rows so service availability wins.
+            if len(source_rows) > 0:
+                self._db.create_table(TABLE_NAME, data=source_rows, mode="overwrite")
+            raise
+
+        self._table = self._db.open_table(TABLE_NAME)
+        LOGGER.info(
+            "Schema repair complete for %s; backup preserved as %s",
+            TABLE_NAME,
+            SCHEMA_FIX_BACKUP_TABLE_NAME,
+        )
 
     def _query_results_to_rows(self, query: Any) -> list[dict[str, Any]]:
         """Convert LanceDB query results into plain row dicts across API versions."""

@@ -5,6 +5,7 @@ set -euo pipefail
 # The script runs against an isolated OpenClaw profile so local default state is untouched.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ROOT_DIR}/.env"
 PROFILE="infinimind-ci"
 BASE_URL="http://127.0.0.1:8080"
 PLUGIN_PATH="${ROOT_DIR}/plugins/infinimind-openclaw-bridge"
@@ -98,6 +99,15 @@ if [[ ! -d "${PLUGIN_PATH}" ]]; then
   exit 1
 fi
 
+# Import local InfiniMind defaults when present so skip-compose runs can reuse
+# the same API keys as the already-running local service.
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+fi
+
 if [[ "${SKIP_COMPOSE}" -eq 0 ]]; then
   export INFINIMIND_API_KEY="${INFINIMIND_API_KEY:-infinimind-e2e-token}"
   export INFINIMIND_ADMIN_API_KEY="${INFINIMIND_ADMIN_API_KEY:-infinimind-e2e-admin-token}"
@@ -186,7 +196,8 @@ config = {
                     "includeSensitiveDefault": False,
                     "rerankDefault": "hybrid",
                     "fallbackMode": "legacy-compatible",
-                    "identityFallback": "error",
+                    "identityFallback": "configured-default",
+                    "defaultUserId": "e2e-default-user",
                 },
             }
         },
@@ -197,17 +208,18 @@ config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 PY
 
 echo "Running OpenClaw plugin checks on profile '${PROFILE}'..."
-# Assert plugin discovery first so later checks fail for the correct root cause.
+# Keep list output for debugging, but don't assert on table contents because
+# OpenClaw truncates the ID column and can split names across rows.
 LIST_OUTPUT="$("${OPENCLAW_BIN}" --profile "${PROFILE}" plugins list)"
 echo "${LIST_OUTPUT}"
-if ! grep -q "infinimind-bridge" <<<"${LIST_OUTPUT}"; then
-  echo "Bridge plugin was not discovered in plugins list output." >&2
-  exit 1
-fi
 
 "${OPENCLAW_BIN}" --profile "${PROFILE}" plugins doctor
 
-INFO_OUTPUT="$("${OPENCLAW_BIN}" --profile "${PROFILE}" plugins info infinimind-bridge)"
+if ! INFO_OUTPUT="$("${OPENCLAW_BIN}" --profile "${PROFILE}" plugins info infinimind-bridge 2>&1)"; then
+  echo "${INFO_OUTPUT}" >&2
+  echo "Bridge plugin was not discoverable via 'plugins info infinimind-bridge'." >&2
+  exit 1
+fi
 echo "${INFO_OUTPUT}"
 if ! grep -q "infinimind-bridge" <<<"${INFO_OUTPUT}"; then
   echo "Bridge plugin info output did not include expected plugin id." >&2
@@ -286,7 +298,8 @@ const api = new FakePluginApi({
   includeSensitiveDefault: false,
   rerankDefault: "hybrid",
   fallbackMode: "legacy-compatible",
-  identityFallback: "error",
+  identityFallback: "configured-default",
+  defaultUserId: "e2e-default-user",
 });
 bridgePlugin.register(api as never);
 
