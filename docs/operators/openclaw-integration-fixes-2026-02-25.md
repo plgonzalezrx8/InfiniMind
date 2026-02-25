@@ -8,6 +8,7 @@ This document records all integration and stabilization work completed for Infin
 - local service orchestration fixes
 - end-to-end validation hardening
 - runtime write-path bug fix in InfiniMind storage
+- post-cutover `memory_recall` 404 remediation caused by local port conflict
 
 This is intended to be commit-ready audit documentation for GitHub.
 
@@ -16,7 +17,8 @@ This is intended to be commit-ready audit documentation for GitHub.
 - Host: macOS user workstation
 - OpenClaw config path: `~/.openclaw/openclaw.json` (external to this repo)
 - InfiniMind project root: `/Users/pedrogonzalez/InfiniMind`
-- InfiniMind service endpoint: `http://127.0.0.1:8080`
+- InfiniMind service endpoint (current): `http://127.0.0.1:8090`
+- InfiniMind service endpoint (pre-fix): `http://127.0.0.1:8080`
 
 ## Incident Summary
 
@@ -26,6 +28,7 @@ This is intended to be commit-ready audit documentation for GitHub.
 2. `memory_recall`/`memory_search` failed when identity fields were omitted.
 3. E2E script produced false-negative plugin discovery failure because `plugins list` output truncates the plugin ID in table format.
 4. `memory_store` returned `HTTP 500` while `memory_recall` could still succeed.
+5. `memory_recall` returned `InfiniMind HTTP 404: 404 page not found` at `2026-02-25T03:01:25Z`.
 
 ### Root causes
 
@@ -46,6 +49,13 @@ This is intended to be commit-ready audit documentation for GitHub.
    - Any non-null write to those fields (for example `channel_id`) raised:
      - `pyarrow.lib.ArrowInvalid: Invalid null value`
    - This caused `memory_store` to fail with HTTP 500.
+
+5. **Local port collision on 8080 (deployment/runtime issue)**
+   - Docker process `com.docke` was already listening on `127.0.0.1:8080`.
+   - InfiniMind launchd service repeatedly failed to bind `8080` with:
+     - `[Errno 48] error while attempting to bind on address ('127.0.0.1', 8080): address already in use`
+   - OpenClaw bridge requests to `http://127.0.0.1:8080/v1/memory/recall` reached a non-InfiniMind process and returned HTTP 404.
+   - This was not a recall endpoint implementation bug in InfiniMind; it was a host-level routing mismatch.
 
 ## Changes Applied
 
@@ -137,9 +147,32 @@ These changes were required for local integration but are outside project git tr
      - `defaultUserId: "pedro"`
 2. Launchd service install
    - plist: `~/Library/LaunchAgents/ai.infinimind.service.plist`
-   - launcher script: `scripts/infinimind-launchd.sh` (currently untracked in repo)
-   - service bound to `127.0.0.1:8080`
+   - launcher script: `scripts/infinimind-launchd.sh`
+   - launcher now supports env-configured bind values:
+     - `INFINIMIND_HOST` (default `127.0.0.1`)
+     - `INFINIMIND_PORT` (default `8080`)
+   - local runtime override in `.env`:
+     - `INFINIMIND_PORT=8090`
+   - service currently bound to `127.0.0.1:8090`
 3. OpenClaw gateway restart and plugin validation executed after config updates.
+4. OpenClaw bridge base URL moved to `http://127.0.0.1:8090` in `~/.openclaw/openclaw.json`.
+
+## E) 404 Incident Timeline (2026-02-25)
+
+1. `03:01:25Z`: OpenClaw logged `memory_recall failed: InfiniMind HTTP 404: 404 page not found`.
+2. Investigation confirmed InfiniMind path contract remained `POST /v1/memory/recall`.
+3. Host checks found:
+   - Docker bound to `127.0.0.1:8080`.
+   - InfiniMind service bind failures on `8080`.
+4. Remediation applied:
+   - Set InfiniMind runtime port to `8090`.
+   - Updated OpenClaw bridge `baseUrl` to `http://127.0.0.1:8090`.
+   - Restarted InfiniMind launchd service and OpenClaw gateway.
+5. Post-fix validation:
+   - `GET /v1/health` on `8090` => `200`
+   - `POST /v1/memory/recall` on `8090` => `200`
+   - bridge E2E (`store/recall/search/forget`) => pass
+   - no new `InfiniMind HTTP 404` entries after the fix window
 
 ## Validation Completed
 
@@ -163,6 +196,10 @@ Result: passing.
 3. Live API checks after schema repair:
    - `POST /v1/memory/store` with `channel_id` returns 200
    - `POST /v1/memory/recall` returns stored entries
+4. Live API + bridge checks after 8080->8090 cutover:
+   - `GET /v1/health` on `http://127.0.0.1:8090` returns 200
+   - direct store/recall smoke tests return 200
+   - `scripts/openclaw_bridge_e2e.sh --base-url http://127.0.0.1:8090 --skip-compose` passes
 
 ## Current Repo Status (relevant files)
 
@@ -176,7 +213,7 @@ Result: passing.
 Untracked local artifacts to review before commit:
 
 - `.data/` (runtime data; do not commit)
-- `scripts/infinimind-launchd.sh` (commit only if you want launchd helper versioned)
+- `scripts/infinimind-launchd.sh` (currently modified to support configurable host/port; commit if you want launchd helper versioned)
 
 ## Recommended Commit Plan
 

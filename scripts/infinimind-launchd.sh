@@ -25,6 +25,11 @@ fi
 export INFINIMIND_DATA_DIR="${INFINIMIND_DATA_DIR:-${ROOT_DIR}/.data}"
 mkdir -p "${INFINIMIND_DATA_DIR}"
 
+# Make bind host/port configurable so local port collisions (for example Docker
+# on 127.0.0.1:8080) do not take InfiniMind offline.
+INFINIMIND_HOST="${INFINIMIND_HOST:-127.0.0.1}"
+INFINIMIND_PORT="${INFINIMIND_PORT:-8080}"
+
 cd "${SERVICE_DIR}"
 
 # Launchd can resolve a different python3 than interactive shells.
@@ -43,4 +48,4 @@ if ! "${PYTHON_BIN}" -c "import uvicorn, fastapi, lancedb" >/dev/null 2>&1; then
 fi
 
 # Replace shell with the API server process for clean signal handling.
-exec "${PYTHON_BIN}" -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+exec "${PYTHON_BIN}" -m uvicorn app.main:app --host "${INFINIMIND_HOST}" --port "${INFINIMIND_PORT}"
