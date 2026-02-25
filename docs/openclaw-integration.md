@@ -1,8 +1,8 @@
-# Openclaw Integration
+# OpenClaw Integration
 
 ## OpenClaw Bridge Integration (Detailed)
 
-See detailed runbook: [docs/openclaw-integration.md](docs/openclaw-integration.md)
+This document covers bridge behavior, config, and validation steps for connecting OpenClaw to InfiniMind.
 
 ### Tool compatibility
 

@@ -4,19 +4,19 @@
 
 ### End-to-end request flow
 
-![InfiniMind end-to-end request flow](docs/assets/flow-end-to-end.svg)
+![InfiniMind end-to-end request flow](assets/flow-end-to-end.svg)
 
 ### Runtime topology (Docker-first)
 
-![InfiniMind runtime topology](docs/assets/runtime-topology.svg)
+![InfiniMind runtime topology](assets/runtime-topology.svg)
 
 ### Memory lifecycle
 
-![InfiniMind memory lifecycle](docs/assets/memory-lifecycle.svg)
+![InfiniMind memory lifecycle](assets/memory-lifecycle.svg)
 
 ### MVP capability mix
 
-![InfiniMind MVP capability mix](docs/assets/mvp-capability-mix.svg)
+![InfiniMind MVP capability mix](assets/mvp-capability-mix.svg)
 
 > Why these visuals matter: InfiniMind is not "just a vector DB". It is a compatibility-preserving memory sidecar with policy enforcement, migration safety, and operational guardrails built in.
 

@@ -1,4 +1,4 @@
-# Testing And Release
+# Testing and Release
 
 ## Testing, CI Gates, and Release Flow
 
