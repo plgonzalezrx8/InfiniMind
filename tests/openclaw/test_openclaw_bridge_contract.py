@@ -30,6 +30,10 @@ def test_bridge_manifest_is_strict_and_memory_kind() -> None:
     identity_enum = schema["properties"]["identityFallback"]["enum"]
     assert identity_enum == ["error", "configured-default"]
     assert schema["properties"]["defaultUserId"]["type"] == "string"
+    assert schema["properties"]["autoRecall"]["type"] == "object"
+    assert schema["properties"]["autoRecall"]["additionalProperties"] is False
+    assert schema["properties"]["autoCapture"]["type"] == "object"
+    assert schema["properties"]["autoCapture"]["additionalProperties"] is False
 
 
 def test_openclaw_config_example_wires_memory_slot() -> None:
@@ -47,6 +51,8 @@ def test_openclaw_config_example_wires_memory_slot() -> None:
     assert bridge_cfg["defaultScope"] == "user"
     assert bridge_cfg["rerankDefault"] == "hybrid"
     assert bridge_cfg["fallbackMode"] == "legacy-compatible"
+    assert bridge_cfg["autoRecall"]["enabled"] is True
+    assert bridge_cfg["autoCapture"]["enabled"] is True
 
 
 def test_bridge_declares_memory_forget_mapping() -> None:
@@ -64,6 +70,15 @@ def test_bridge_declares_memory_search_alias_mapping() -> None:
     source = BRIDGE_INDEX_PATH.read_text(encoding="utf-8")
     assert 'name: "memory_search"' in source
     assert '"/v1/memory/recall"' in source
+
+
+def test_bridge_declares_hook_based_enrichment() -> None:
+    """Bridge source should register OpenClaw lifecycle hooks for auto enrichment."""
+
+    source = BRIDGE_INDEX_PATH.read_text(encoding="utf-8")
+    assert '"before_prompt_build"' in source
+    assert '"before_agent_start"' in source
+    assert '"agent_end"' in source
 
 
 def test_bridge_package_contract_for_install_and_typecheck() -> None:

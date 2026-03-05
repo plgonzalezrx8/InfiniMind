@@ -19,7 +19,25 @@
           "includeSensitiveDefault": false,
           "rerankDefault": "hybrid",
           "fallbackMode": "legacy-compatible",
-          "identityFallback": "error"
+          "identityFallback": "error",
+          "autoRecall": {
+            "enabled": true,
+            "hook": "before_prompt_build",
+            "limit": 3,
+            "minScore": 0.3,
+            "timeoutMs": 1500,
+            "maxInjectedChars": 2500,
+            "includeSensitive": false
+          },
+          "autoCapture": {
+            "enabled": true,
+            "maxPerTurn": 3,
+            "minChars": 20,
+            "maxChars": 800,
+            "dedupeThreshold": 0.9,
+            "defaultCategory": "other",
+            "sensitivityDefault": "low"
+          }
         }
       }
     }

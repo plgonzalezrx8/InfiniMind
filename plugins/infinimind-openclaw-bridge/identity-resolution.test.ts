@@ -7,6 +7,7 @@ type ToolDef = {
   name: string;
   execute: (toolCallId: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
+type HookHandler = (event: any, ctx: any) => Promise<Record<string, unknown> | void> | Record<string, unknown> | void;
 
 class FakePluginApi {
   pluginConfig: Record<string, unknown>;
@@ -14,8 +15,12 @@ class FakePluginApi {
     info: () => {
       // No-op logger for deterministic tests.
     },
+    warn: () => {
+      // No-op logger for deterministic tests.
+    },
   };
   tools: Record<string, ToolDef> = {};
+  hooks: Record<string, HookHandler> = {};
 
   constructor(config: Record<string, unknown>) {
     this.pluginConfig = config;
@@ -27,6 +32,10 @@ class FakePluginApi {
 
   registerService(): void {
     // Service lifecycle hooks are irrelevant for these unit tests.
+  }
+
+  on(name: string, handler: HookHandler): void {
+    this.hooks[name] = handler;
   }
 }
 

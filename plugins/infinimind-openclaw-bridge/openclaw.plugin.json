@@ -46,6 +46,21 @@
       "label": "Default User ID",
       "help": "Used only when identityFallback=configured-default",
       "advanced": true
+    },
+    "autoRecall.enabled": {
+      "label": "Auto Recall Enabled",
+      "help": "Inject relevant memories before prompt build",
+      "advanced": true
+    },
+    "autoRecall.hook": {
+      "label": "Auto Recall Hook",
+      "help": "Preferred: before_prompt_build; optional legacy: before_agent_start",
+      "advanced": true
+    },
+    "autoCapture.enabled": {
+      "label": "Auto Capture Enabled",
+      "help": "Store durable user messages automatically on agent end",
+      "advanced": true
     }
   },
   "configSchema": {
@@ -60,8 +75,51 @@
       "rerankDefault": { "type": "string", "enum": ["off", "hybrid"] },
       "fallbackMode": { "type": "string", "enum": ["off", "legacy-compatible"] },
       "identityFallback": { "type": "string", "enum": ["error", "configured-default"] },
-      "defaultUserId": { "type": "string", "minLength": 1 }
+      "defaultUserId": { "type": "string", "minLength": 1 },
+      "autoRecall": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "hook": { "type": "string", "enum": ["before_prompt_build", "before_agent_start"] },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
+          "minScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 120000 },
+          "maxInjectedChars": { "type": "integer", "minimum": 128, "maximum": 32000 },
+          "includeSensitive": { "type": "boolean" }
+        }
+      },
+      "autoCapture": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "maxPerTurn": { "type": "integer", "minimum": 1, "maximum": 20 },
+          "minChars": { "type": "integer", "minimum": 1, "maximum": 20000 },
+          "maxChars": { "type": "integer", "minimum": 10, "maximum": 100000 },
+          "dedupeThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "defaultCategory": {
+            "type": "string",
+            "enum": ["preference", "fact", "decision", "entity", "other"]
+          },
+          "sensitivityDefault": { "type": "string", "enum": ["low", "medium", "high"] },
+          "ttlHoursDefault": { "type": "integer", "minimum": 1, "maximum": 8760 }
+        }
+      }
     },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "identityFallback": { "const": "configured-default" }
+          },
+          "required": ["identityFallback"]
+        },
+        "then": {
+          "required": ["defaultUserId"]
+        }
+      }
+    ],
     "required": ["baseUrl", "apiKey"]
   }
 }

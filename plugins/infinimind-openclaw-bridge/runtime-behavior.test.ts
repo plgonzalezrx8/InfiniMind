@@ -8,6 +8,7 @@ type ToolDef = {
   name: string;
   execute: (toolCallId: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
+type HookHandler = (event: any, ctx: any) => Promise<Record<string, unknown> | void> | Record<string, unknown> | void;
 
 class FakePluginApi {
   pluginConfig: Record<string, unknown>;
@@ -15,8 +16,12 @@ class FakePluginApi {
     info: () => {
       // Keep test output deterministic.
     },
+    warn: () => {
+      // Keep test output deterministic.
+    },
   };
   tools: Record<string, ToolDef> = {};
+  hooks: Record<string, HookHandler> = {};
 
   constructor(config: Record<string, unknown>) {
     this.pluginConfig = config;
@@ -28,6 +33,10 @@ class FakePluginApi {
 
   registerService(): void {
     // Service lifecycle hooks are irrelevant for these unit tests.
+  }
+
+  on(name: string, handler: HookHandler): void {
+    this.hooks[name] = handler;
   }
 }
 
@@ -137,6 +146,25 @@ test("http client enforces timeout via abort controller", async () => {
     fallbackMode: "legacy-compatible",
     identityFallback: "error",
     defaultUserId: null,
+    autoRecall: {
+      enabled: false,
+      hook: "before_prompt_build",
+      limit: 3,
+      minScore: 0.3,
+      timeoutMs: 1500,
+      maxInjectedChars: 2500,
+      includeSensitive: false,
+    },
+    autoCapture: {
+      enabled: false,
+      maxPerTurn: 3,
+      minChars: 20,
+      maxChars: 800,
+      dedupeThreshold: 0.9,
+      defaultCategory: "other",
+      sensitivityDefault: "low",
+      ttlHoursDefault: null,
+    },
   });
 
   const restoreFetch = withMockedFetch(async (_url, init) => {

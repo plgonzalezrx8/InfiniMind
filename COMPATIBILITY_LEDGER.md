@@ -669,3 +669,15 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Harden smoke startup checks to wait for both health and authenticated readiness, and fix JSON assertion parsing to avoid heredoc/herestring stdin conflicts.
 - Impact:
   - Docker smoke gate no longer fails with transient connection-reset startup races or Python `NameError` parsing failures on JSON `null` values.
+
+## 2026-03-05 — Feature: `feat(bridge-hooks): add auto recall/capture lifecycle hooks with strict config`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/agent-loop.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/memory.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/extensions/memory-lancedb/index.ts
+- Decision:
+  - Add bridge-managed lifecycle hooks (`before_prompt_build` with optional legacy `before_agent_start`, plus `agent_end`) and expose strict nested config for `autoRecall` and `autoCapture`, while keeping existing memory tools unchanged.
+- Impact:
+  - InfiniMind can now enrich OpenClaw conversations automatically (context injection + durable capture) with fail-open hook behavior, deterministic hook identity derivation, and strict manifest/schema compatibility.
