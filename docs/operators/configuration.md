@@ -163,7 +163,10 @@ Required changes:
 2. add bridge id to `plugins.allow`
 3. set `plugins.slots.memory = "infinimind-bridge"`
 4. configure `plugins.entries.infinimind-bridge.config`
-5. prefer `identityFallback: "error"`
+5. configure hook enrichment behavior:
+   - `autoRecall.enabled` and `autoRecall.hook`
+   - `autoCapture.enabled` and capture bounds
+6. prefer `identityFallback: "error"`
 
 If using `identityFallback: "configured-default"`, you must set `defaultUserId`.
 
@@ -199,6 +202,7 @@ openclaw --profile infinimind-ci plugins list
 openclaw --profile infinimind-ci plugins doctor
 openclaw --profile infinimind-ci plugins info infinimind-bridge
 openclaw --profile infinimind-ci config get plugins.slots.memory
+openclaw --profile infinimind-ci hooks list
 ```
 
 ### Bridge E2E script
@@ -231,14 +235,16 @@ scripts/openclaw_bridge_e2e.sh --profile infinimind-ci
 - memory slot bound to bridge
 - identity fallback mode explicitly configured
 - tool compatibility present: `memory_store`, `memory_recall`, `memory_forget`, `memory_search`
+- hook enrichment visible in `hooks list` when enabled
 
 ## Canary Rollout Steps
 
 1. deploy sidecar with production-equivalent settings
 2. enable bridge for limited tenant/user/agent cohort
 3. keep `fallbackMode: "legacy-compatible"` in initial canary
-4. monitor metrics and latency
-5. expand cohort only after stable safety/latency windows
+4. keep `autoRecall.hook: "before_prompt_build"` unless legacy mode is explicitly required
+5. monitor metrics and latency
+6. expand cohort only after stable safety/latency windows
 
 Monitor minimum metrics:
 

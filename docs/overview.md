@@ -19,6 +19,7 @@ Key capabilities:
 - strict policy filtering (scope/sensitivity/TTL/time)
 - hybrid recall ranking
 - forget workflow with explicit delete/candidate semantics
+- hook-based auto enrichment (`before_prompt_build` / `agent_end`)
 - metrics and optional tracing
 - CI-gated release automation
 
@@ -31,13 +32,18 @@ Key capabilities:
 
 ## Current Status
 
-Working MVP on branch `codex/infinimind-mvp` with:
+Working MVP with:
 
 - service and bridge test coverage
 - executable OpenClaw bridge E2E script
 - GitHub Actions quality gates
 - Docker-first smoke flow
 - operator runbooks for rollout and rollback
+
+Release flow uses:
+
+- `development` as beta/release-candidate branch
+- `master` as production branch
 
 ## Repository Layout
 

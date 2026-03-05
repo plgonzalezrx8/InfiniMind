@@ -2,6 +2,30 @@
 
 ## Testing, CI Gates, and Release Flow
 
+## Branching and Promotion Model
+
+Long-lived branches:
+
+- `master`: production-ready branch
+- `development`: beta/release-candidate branch
+
+Short-lived work branches:
+
+- `feature/<name>`
+- `sprint/<name>`
+
+Promotion flow:
+
+1. branch from `development`
+2. merge feature/sprint branch into `development` after required gates pass
+3. validate RC on `development`
+4. merge `development` into `master` for production promotion
+5. delete merged feature/sprint branches locally and remotely
+
+Reference:
+
+- [docs/branching-model.md](branching-model.md)
+
 ### Local gate runner (single entrypoint)
 
 Default gate set:

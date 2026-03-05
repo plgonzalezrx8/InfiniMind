@@ -5,6 +5,7 @@
 - [Getting Started](getting-started.md)
 - [API Reference](api-reference.md)
 - [OpenClaw Integration](openclaw-integration.md)
+- [Branching Model](branching-model.md)
 - [Testing & Release](testing-and-release.md)
 - [Operations](operations.md)
 - [Operator Runbooks](operators/)

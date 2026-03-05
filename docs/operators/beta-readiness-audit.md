@@ -23,7 +23,7 @@ Scope:
 
 ## Baseline Evidence Snapshot
 
-Collected on 2026-02-24 from local branch `codex/infinimind-mvp`.
+Collected on 2026-02-24 from the release-candidate branch (now `development`).
 
 | Check | Local status | Evidence summary |
 | --- | --- | --- |

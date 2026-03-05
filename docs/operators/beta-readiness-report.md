@@ -1,7 +1,7 @@
 # Beta Readiness Report
 
 Date: 2026-02-24
-Branch: `codex/infinimind-mvp`
+Branch: release-candidate branch (`development`)
 Scope: Iteration 5 hardening and release verification
 
 ## Summary

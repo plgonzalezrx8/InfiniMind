@@ -681,3 +681,15 @@ This ledger records OpenClaw documentation/source checks performed before each f
   - Add bridge-managed lifecycle hooks (`before_prompt_build` with optional legacy `before_agent_start`, plus `agent_end`) and expose strict nested config for `autoRecall` and `autoCapture`, while keeping existing memory tools unchanged.
 - Impact:
   - InfiniMind can now enrich OpenClaw conversations automatically (context injection + durable capture) with fail-open hook behavior, deterministic hook identity derivation, and strict manifest/schema compatibility.
+
+## 2026-03-05 — Feature: `docs(workflow): document master/development branching and hook-enrichment operator setup`
+- Sources consulted:
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/plugin.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/cli/hooks.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/gateway/configuration.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/plugins/manifest.md
+  - https://raw.githubusercontent.com/openclaw/openclaw/main/docs/concepts/agent-loop.md
+- Decision:
+  - Update split documentation set with explicit hook-enrichment config (`autoRecall`/`autoCapture`) and add a formal branching model (`master` production, `development` release-candidate, short-lived `feature/*` and `sprint/*` branches).
+- Impact:
+  - Operators and contributors now have deterministic guidance for both OpenClaw plugin configuration and repository release flow, reducing rollout ambiguity and branch-policy drift.

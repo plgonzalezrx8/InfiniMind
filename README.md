@@ -45,6 +45,7 @@ Full docs are split by topic in [`docs/README.md`](docs/README.md):
 - [Getting Started](docs/getting-started.md)
 - [API Reference](docs/api-reference.md)
 - [OpenClaw Integration](docs/openclaw-integration.md)
+- [Branching Model](docs/branching-model.md)
 - [Testing & Release](docs/testing-and-release.md)
 - [Operations](docs/operations.md)
 - [Operator Runbooks](docs/operators/)

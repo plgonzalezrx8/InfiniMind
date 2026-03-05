@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this checklist before merging `codex/infinimind-mvp` into `main`.
+Use this checklist before promoting `development` into `master`.
 
 ## 1. Branch integrity
 
@@ -64,10 +64,12 @@ Confirm all required GitHub checks are green:
 
 - Ensure OpenClaw config references only discoverable plugin ids.
 - Ensure bridge config uses `identityFallback: "error"` unless a deliberate `defaultUserId` is configured.
+- Ensure hook enrichment settings match rollout intent (`autoRecall.enabled`, `autoCapture.enabled`).
 - Verify plugin and slot state in isolated profile:
   - `openclaw --profile infinimind-ci plugins list`
   - `openclaw --profile infinimind-ci plugins doctor`
   - `openclaw --profile infinimind-ci config get plugins.slots.memory`
+  - `openclaw --profile infinimind-ci hooks list`
 
 ## 6. Safety checks
 
@@ -86,7 +88,7 @@ Confirm all required GitHub checks are green:
 
 ## 8. Merge readiness
 
-- Open PR from `codex/infinimind-mvp` to `main`.
+- Ensure release PR is `development -> master`.
 - Include benchmark output from `scripts/benchmark_recall.py`.
 - Include canary plan and rollback owner.
 
