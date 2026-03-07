@@ -286,7 +286,7 @@ export const bridgeConfigSchema = {
         minChars: autoCaptureMinChars,
         maxChars: autoCaptureMaxChars,
         dedupeThreshold: parseNumberInRange(autoCapture.dedupeThreshold, {
-          fallback: 0.9,
+          fallback: 0.92,
           min: 0,
           max: 1,
           label: "autoCapture.dedupeThreshold",

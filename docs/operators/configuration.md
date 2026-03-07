@@ -253,6 +253,7 @@ Monitor minimum metrics:
 - `infinimind_recall_fallback_total`
 - `infinimind_policy_note_total`
 - `infinimind_store_results_total`
+- `infinimind_store_merges_total`
 
 ## Beta Go/No-Go Procedure
 

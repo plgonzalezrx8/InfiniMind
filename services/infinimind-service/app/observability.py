@@ -36,6 +36,11 @@ STORE_RESULTS_TOTAL = Counter(
     "Count of store outcomes",
     ["action"],
 )
+STORE_MERGES_TOTAL = Counter(
+    "infinimind_store_merges_total",
+    "Count of store merges by dedupe reason",
+    ["reason"],
+)
 
 
 

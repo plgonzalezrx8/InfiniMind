@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import math
+
 
 def _mutate_stored_json_fields(
     client,
@@ -78,7 +81,7 @@ def test_health_and_ready(client, auth_headers):
 
 
 def test_store_duplicate_and_recall(client, auth_headers):
-    """Store endpoint should dedupe identical content and recall it."""
+    """Exact duplicates should return duplicate and merge bounded fields into the canonical row."""
 
     payload = {
         "tenant_id": "default",
@@ -86,15 +89,41 @@ def test_store_duplicate_and_recall(client, auth_headers):
         "agent_id": "main",
         "text": "Remember that I prefer concise commit messages.",
         "category": "preference",
+        "tags": ["style"],
+        "metadata": {"source": "first-write"},
+        "importance": 0.3,
     }
 
     first = client.post("/v1/memory/store", json=payload, headers=auth_headers)
     assert first.status_code == 200
     assert first.json()["action"] == "created"
+    canonical_id = first.json()["memory_id"]
 
-    duplicate = client.post("/v1/memory/store", json=payload, headers=auth_headers)
+    duplicate_payload = {
+        **payload,
+        "tags": ["style", "git"],
+        "metadata": {"owner": "platform"},
+        "importance": 0.9,
+    }
+    duplicate = client.post("/v1/memory/store", json=duplicate_payload, headers=auth_headers)
     assert duplicate.status_code == 200
     assert duplicate.json()["action"] == "duplicate"
+    assert duplicate.json()["memory_id"] == canonical_id
+
+    merged_rows = client.app.state.memory_store.scoped_memories(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        limit=None,
+    )
+    assert len(merged_rows) == 1
+    merged_row = merged_rows[0]
+    assert merged_row["memory_id"] == canonical_id
+    assert merged_row["importance"] == 0.9
+    assert set(json.loads(merged_row["tags_json"])) == {"style", "git"}
+    merged_metadata = json.loads(merged_row["metadata_json"])
+    assert merged_metadata["source"] == "first-write"
+    assert merged_metadata["owner"] == "platform"
 
     recall = client.post(
         "/v1/memory/recall",
@@ -112,6 +141,101 @@ def test_store_duplicate_and_recall(client, auth_headers):
     body = recall.json()
     assert body["count"] >= 1
     assert "score_breakdown" in body["memories"][0]
+
+
+def test_store_similarity_auto_merge_and_strict_threshold_boundary(client, auth_headers):
+    """Similarity merges should trigger above 0.92 and not trigger at exactly 0.92."""
+
+    vector_dim = client.app.state.memory_store._vector_dim
+
+    def _basis_vector(x: float, y: float) -> list[float]:
+        vector = [0.0 for _ in range(vector_dim)]
+        vector[0] = x
+        vector[1] = y
+        return vector
+
+    class _EmbeddingStub:
+        def embed(self, text: str) -> list[float]:
+            if text == "Base canonical memory":
+                return _basis_vector(1.0, 0.0)
+            if text == "Near duplicate memory":
+                return _basis_vector(0.93, math.sqrt(1 - 0.93**2))
+            if text == "Boundary memory":
+                return _basis_vector(0.92, math.sqrt(1 - 0.92**2))
+            return _basis_vector(0.0, 1.0)
+
+    client.app.state.embedding_client = _EmbeddingStub()
+
+    first = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "sim-user",
+            "agent_id": "main",
+            "text": "Base canonical memory",
+            "category": "fact",
+            "tags": ["base"],
+        },
+        headers=auth_headers,
+    )
+    assert first.status_code == 200
+    assert first.json()["action"] == "created"
+    canonical_id = first.json()["memory_id"]
+
+    near_duplicate = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "sim-user",
+            "agent_id": "main",
+            "text": "Near duplicate memory",
+            "category": "fact",
+            "tags": ["near"],
+            "metadata": {"note": "merged"},
+        },
+        headers=auth_headers,
+    )
+    assert near_duplicate.status_code == 200
+    assert near_duplicate.json()["action"] == "duplicate"
+    assert near_duplicate.json()["memory_id"] == canonical_id
+
+    boundary_anchor = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "sim-boundary-user",
+            "agent_id": "main",
+            "text": "Base canonical memory",
+            "category": "fact",
+        },
+        headers=auth_headers,
+    )
+    assert boundary_anchor.status_code == 200
+    assert boundary_anchor.json()["action"] == "created"
+
+    boundary = client.post(
+        "/v1/memory/store",
+        json={
+            "tenant_id": "default",
+            "user_id": "sim-boundary-user",
+            "agent_id": "main",
+            "text": "Boundary memory",
+            "category": "fact",
+        },
+        headers=auth_headers,
+    )
+    assert boundary.status_code == 200
+    assert boundary.json()["action"] == "created"
+
+    rows = client.app.state.memory_store.scoped_memories(
+        tenant_id="default",
+        user_id="sim-user",
+        agent_id="main",
+        limit=None,
+    )
+    assert len(rows) == 1
+    merged_row = next(row for row in rows if row["memory_id"] == canonical_id)
+    assert merged_row["text"] == "Near duplicate memory"
 
 
 def test_policy_sensitive_gate_and_fallback(client, auth_headers):
@@ -217,6 +341,7 @@ def test_metrics_endpoint(client):
     metrics = client.get("/v1/metrics")
     assert metrics.status_code == 200
     assert "infinimind_http_requests_total" in metrics.text
+    assert "infinimind_store_merges_total" in metrics.text
 
 
 def test_forget_endpoint_paths(client, auth_headers):

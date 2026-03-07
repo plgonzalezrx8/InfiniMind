@@ -46,6 +46,7 @@ test("parse applies safe defaults for autoRecall and autoCapture", () => {
   assert.equal(parsed.autoRecall.minScore, 0.3);
   assert.equal(parsed.autoCapture.enabled, false);
   assert.equal(parsed.autoCapture.maxPerTurn, 3);
+  assert.equal(parsed.autoCapture.dedupeThreshold, 0.92);
   assert.equal(parsed.autoCapture.defaultCategory, "other");
   assert.equal(parsed.autoCapture.ttlHoursDefault, null);
 });

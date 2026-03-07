@@ -30,6 +30,7 @@ from .models import HealthResponse
 from .observability import (
     POLICY_NOTES_TOTAL,
     RECALL_FALLBACK_TOTAL,
+    STORE_MERGES_TOTAL,
     STORE_RESULTS_TOTAL,
     install_metrics_middleware,
     install_optional_tracing,
@@ -38,10 +39,62 @@ from .observability import (
 from .policy import apply_hard_filters, apply_safe_fallback
 from .retrieval import hybrid_rank
 from .settings import get_settings
-from .storage import LanceMemoryStore
+from .storage import LanceMemoryStore, SIMILARITY_DEDUPE_THRESHOLD
 
 APP_VERSION = "0.1.0"
 LOGGER = logging.getLogger(__name__)
+
+
+def _coerce_row_vector(vector_obj: object) -> list[float]:
+    """Normalize backend vector payloads so merge paths can safely reuse stored vectors."""
+
+    if vector_obj is None:
+        return []
+    if isinstance(vector_obj, list):
+        return [float(value) for value in vector_obj]
+    if hasattr(vector_obj, "tolist"):
+        return [float(value) for value in vector_obj.tolist()]
+    try:
+        return [float(value) for value in vector_obj]
+    except TypeError:
+        return []
+
+
+def _build_memory_record(
+    *,
+    payload: StoreMemoryRequest,
+    embedding_model_id: str,
+    content_hash: str,
+    now_iso: str,
+    ttl_expires_at: str | None,
+    vector: list[float],
+) -> MemoryRecord:
+    """Construct canonical storage model from store payload with one shared field mapping."""
+
+    return MemoryRecord(
+        tenant_id=payload.tenant_id,
+        user_id=payload.user_id,
+        agent_id=payload.agent_id,
+        text=payload.text,
+        category=payload.category,
+        tags=payload.tags,
+        importance=payload.importance,
+        scope=payload.scope,
+        sensitivity=payload.sensitivity,
+        source_channel=payload.channel_id,
+        source_session=payload.session_id,
+        source_actor=payload.actor_id,
+        created_at=now_iso,
+        updated_at=now_iso,
+        ttl_expires_at=ttl_expires_at,
+        embedding_model_id=embedding_model_id,
+        content_hash=content_hash,
+        dedupe_key=payload.dedupe_key,
+        metadata=payload.metadata,
+        provenance=payload.provenance,
+        quality=payload.quality,
+        vector=vector,
+    )
 
 
 @asynccontextmanager
@@ -164,47 +217,76 @@ def _store_one(payload: StoreMemoryRequest) -> StoreMemoryResult:
     """Store one memory item with duplicate detection."""
 
     settings = get_settings()
+    now_iso = datetime.now(UTC).isoformat()
+    ttl_expires_at = payload.ttl_expires_at()
     content_hash = compute_content_hash(payload.text)
 
-    duplicate = app.state.memory_store.find_duplicate(
+    exact_duplicate = app.state.memory_store.find_exact_duplicate(
         tenant_id=payload.tenant_id,
         user_id=payload.user_id,
         agent_id=payload.agent_id,
         content_hash=content_hash,
         dedupe_key=payload.dedupe_key,
     )
-    if duplicate:
+    if exact_duplicate:
+        # Exact content matches can safely reuse a stored vector and skip re-embedding.
+        vector = []
+        if str(exact_duplicate.get("content_hash") or "") == content_hash:
+            vector = _coerce_row_vector(exact_duplicate.get("vector"))
+        if len(vector) != settings.vector_dim:
+            vector = app.state.embedding_client.embed(payload.text)
+
+        merged_record = _build_memory_record(
+            payload=payload,
+            embedding_model_id=settings.embedding_model,
+            content_hash=content_hash,
+            now_iso=now_iso,
+            ttl_expires_at=ttl_expires_at,
+            vector=vector,
+        )
+        merged_row = app.state.memory_store.merge_memory(existing_row=exact_duplicate, incoming_record=merged_record)
+        merged_id = str(merged_row.get("memory_id") or exact_duplicate.get("memory_id"))
+        STORE_MERGES_TOTAL.labels(reason="exact").inc()
         STORE_RESULTS_TOTAL.labels(action="duplicate").inc()
         return StoreMemoryResult(
             action="duplicate",
-            memory_id=str(duplicate.get("memory_id")),
-            duplicate_of=str(duplicate.get("memory_id")),
+            memory_id=merged_id,
+            duplicate_of=merged_id,
         )
 
-    now_iso = datetime.now(UTC).isoformat()
     vector = app.state.embedding_client.embed(payload.text)
-    record = MemoryRecord(
+    similarity_duplicate, _ = app.state.memory_store.find_similarity_duplicate(
         tenant_id=payload.tenant_id,
         user_id=payload.user_id,
         agent_id=payload.agent_id,
-        text=payload.text,
-        category=payload.category,
-        tags=payload.tags,
-        importance=payload.importance,
-        scope=payload.scope,
-        sensitivity=payload.sensitivity,
-        source_channel=payload.channel_id,
-        source_session=payload.session_id,
-        source_actor=payload.actor_id,
-        created_at=now_iso,
-        updated_at=now_iso,
-        ttl_expires_at=payload.ttl_expires_at(),
+        query_vector=vector,
+        cosine_threshold=SIMILARITY_DEDUPE_THRESHOLD,
+    )
+    if similarity_duplicate:
+        merged_record = _build_memory_record(
+            payload=payload,
+            embedding_model_id=settings.embedding_model,
+            content_hash=content_hash,
+            now_iso=now_iso,
+            ttl_expires_at=ttl_expires_at,
+            vector=vector,
+        )
+        merged_row = app.state.memory_store.merge_memory(existing_row=similarity_duplicate, incoming_record=merged_record)
+        merged_id = str(merged_row.get("memory_id") or similarity_duplicate.get("memory_id"))
+        STORE_MERGES_TOTAL.labels(reason="similarity").inc()
+        STORE_RESULTS_TOTAL.labels(action="duplicate").inc()
+        return StoreMemoryResult(
+            action="duplicate",
+            memory_id=merged_id,
+            duplicate_of=merged_id,
+        )
+
+    record = _build_memory_record(
+        payload=payload,
         embedding_model_id=settings.embedding_model,
         content_hash=content_hash,
-        dedupe_key=payload.dedupe_key,
-        metadata=payload.metadata,
-        provenance=payload.provenance,
-        quality=payload.quality,
+        now_iso=now_iso,
+        ttl_expires_at=ttl_expires_at,
         vector=vector,
     )
     app.state.memory_store.store_memory(record)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 from datetime import UTC, datetime
 
 import pytest
@@ -194,6 +196,150 @@ def test_in_memory_store_vector_search_shadow_and_scoped_helpers(tmp_path):
     assert shadow_name is not None
     assert shadow_name in store._shadow_tables
     assert store.write_shadow_embeddings(target_model_id="text-embedding-3-small", rows=[], vectors=[]) is None
+
+
+def test_find_merge_candidate_supports_exact_similarity_and_boundary(tmp_path):
+    """Merge candidate resolution should prefer exact, then similarity above strict threshold."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=2)
+    store._in_memory_mode = True
+    store._rows = [
+        {
+            "memory_id": "exact-target",
+            "tenant_id": "default",
+            "user_id": "user-1",
+            "agent_id": "main",
+            "content_hash": "hash-1",
+            "dedupe_key": "dedupe-key-1",
+            "vector": [0.0, 1.0],
+        },
+        {
+            "memory_id": "sim-b",
+            "tenant_id": "default",
+            "user_id": "user-1",
+            "agent_id": "main",
+            "content_hash": "hash-2",
+            "dedupe_key": None,
+            "vector": [1.0, 0.0],
+        },
+        {
+            "memory_id": "sim-a",
+            "tenant_id": "default",
+            "user_id": "user-1",
+            "agent_id": "main",
+            "content_hash": "hash-3",
+            "dedupe_key": None,
+            "vector": [1.0, 0.0],
+        },
+        {
+            # Same vector but different user should never participate in dedupe.
+            "memory_id": "foreign",
+            "tenant_id": "default",
+            "user_id": "other-user",
+            "agent_id": "main",
+            "content_hash": "hash-foreign",
+            "dedupe_key": None,
+            "vector": [1.0, 0.0],
+        },
+    ]
+
+    exact_row, exact_reason, exact_score = store.find_merge_candidate(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        content_hash="hash-1",
+        dedupe_key=None,
+        query_vector=[0.93, math.sqrt(1 - 0.93**2)],
+    )
+    assert exact_row is not None
+    assert exact_row["memory_id"] == "exact-target"
+    assert exact_reason == "exact"
+    assert exact_score == 1.0
+
+    similarity_row, similarity_reason, similarity_score = store.find_merge_candidate(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        content_hash="missing-hash",
+        dedupe_key=None,
+        query_vector=[0.93, math.sqrt(1 - 0.93**2)],
+    )
+    assert similarity_row is not None
+    # Tie-breaking should pick lexical-lowest memory id among equal scores.
+    assert similarity_row["memory_id"] == "sim-a"
+    assert similarity_reason == "similarity"
+    assert similarity_score is not None
+    assert similarity_score > 0.92
+
+    below_threshold_row, below_threshold_reason, below_threshold_score = store.find_merge_candidate(
+        tenant_id="default",
+        user_id="user-1",
+        agent_id="main",
+        content_hash="missing-hash",
+        dedupe_key=None,
+        query_vector=[0.92, math.sqrt(1 - 0.92**2)],
+    )
+    assert below_threshold_row is None
+    assert below_threshold_reason is None
+    assert below_threshold_score is None
+
+
+def test_merge_memory_applies_bounded_field_policy(tmp_path):
+    """Canonical merge should preserve identity while applying deterministic field precedence."""
+
+    store = LanceMemoryStore(db_path=tmp_path / "lancedb", vector_dim=4)
+    store._in_memory_mode = True
+    store.store_memory(
+        _memory_record(
+            memory_id="canonical-1",
+            text="Old memory text",
+            tags=["ops"],
+            metadata={"owner": "alice", "source": "legacy"},
+            importance=0.4,
+            ttl_expires_at="2026-01-01T00:00:00+00:00",
+            dedupe_key="old-key",
+            created_at="2026-01-01T00:00:00+00:00",
+            updated_at="2026-01-02T00:00:00+00:00",
+            vector=[1.0, 0.0, 0.0, 0.0],
+        )
+    )
+    existing_row = store.list_all_memories()[0]
+
+    incoming_record = _memory_record(
+        memory_id="incoming-id",
+        text="New memory text",
+        category="decision",
+        tags=["ops", "engineering"],
+        metadata={"owner": "bob", "ticket": "INC-42"},
+        importance=0.9,
+        ttl_expires_at="2026-02-01T00:00:00+00:00",
+        dedupe_key="new-key",
+        created_at="2026-03-01T00:00:00+00:00",
+        updated_at="2026-03-02T00:00:00+00:00",
+        vector=[0.0, 1.0, 0.0, 0.0],
+    )
+
+    merged_row = store.merge_memory(existing_row=existing_row, incoming_record=incoming_record)
+
+    assert merged_row["memory_id"] == "canonical-1"
+    assert merged_row["created_at"] == "2026-01-01T00:00:00+00:00"
+    assert merged_row["updated_at"] == "2026-03-02T00:00:00+00:00"
+    assert merged_row["text"] == "New memory text"
+    assert merged_row["category"] == "decision"
+    assert json.loads(merged_row["tags_json"]) == ["ops", "engineering"]
+    assert json.loads(merged_row["metadata_json"]) == {
+        "owner": "bob",
+        "source": "legacy",
+        "ticket": "INC-42",
+    }
+    assert merged_row["importance"] == 0.9
+    assert merged_row["ttl_expires_at"] == "2026-02-01T00:00:00+00:00"
+    assert merged_row["dedupe_key"] == "new-key"
+    assert merged_row["vector"] == [0.0, 1.0, 0.0, 0.0]
+
+    # In-memory merge should replace canonical row in-place rather than append a new row.
+    assert len(store._rows) == 1
+    assert store._rows[0]["memory_id"] == "canonical-1"
 
 
 def test_vector_and_shadow_paths_for_db_mode(tmp_path):

@@ -35,6 +35,7 @@ Core request fields:
 Response:
 
 - `action`: `created` or `duplicate`
+- `duplicate` indicates the incoming payload was auto-merged into an existing canonical record
 - `memory_id`
 - `duplicate_of` when applicable
 

@@ -95,7 +95,7 @@ Target file: `~/.openclaw/openclaw.json` (JSON5).
             maxPerTurn: 3,
             minChars: 20,
             maxChars: 800,
-            dedupeThreshold: 0.9,
+            dedupeThreshold: 0.92,
             defaultCategory: "other",
             sensitivityDefault: "low"
             // Optional:
@@ -127,7 +127,7 @@ Target file: `~/.openclaw/openclaw.json` (JSON5).
 - `enabled`: enable/disable auto capture at `agent_end`
 - `maxPerTurn`: max writes per successful run
 - `minChars` / `maxChars`: capture bounds
-- `dedupeThreshold`: top-hit similarity threshold to skip near-duplicate capture
+- `dedupeThreshold`: top-hit similarity threshold to skip near-duplicate capture (default `0.92`)
 - `defaultCategory`: category for auto-captured records
 - `sensitivityDefault`: default sensitivity for auto-captured records
 - `ttlHoursDefault`: optional expiry for auto-captured records (`null` means no TTL)

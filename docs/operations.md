@@ -15,6 +15,7 @@ Important metric series:
 - `infinimind_recall_fallback_total`
 - `infinimind_policy_note_total`
 - `infinimind_store_results_total`
+- `infinimind_store_merges_total`
 
 ### Tracing
 

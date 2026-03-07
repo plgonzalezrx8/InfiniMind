@@ -9,7 +9,7 @@ import math
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .memory_schema import MemoryRecord
 
@@ -18,6 +18,7 @@ TABLE_NAME = "memories_v3"
 LEGACY_TABLE_NAME = "memories_v2"
 MIGRATION_BATCH_SIZE = 10_000
 SCHEMA_FIX_BACKUP_TABLE_NAME = f"{TABLE_NAME}__schema_fix_backup"
+SIMILARITY_DEDUPE_THRESHOLD = 0.92
 
 # These fields are semantically optional strings. If the bootstrap row uses
 # nulls, Lance/Arrow can infer a `null`-typed column that rejects later strings.
@@ -437,11 +438,10 @@ class LanceMemoryStore:
             except Exception as exc:  # pragma: no cover - backend capability variation
                 LOGGER.debug("Skipping FTS index creation: %s", exc)
 
-    def store_memory(self, record: MemoryRecord) -> MemoryRecord:
-        """Persist one memory record and return the persisted object."""
+    def _record_to_row(self, record: MemoryRecord) -> dict[str, Any]:
+        """Convert a validated memory model into the Lance row payload."""
 
-        self.ensure_initialized()
-        row = {
+        return {
             "memory_id": record.memory_id,
             "schema_version": record.schema_version,
             "tenant_id": record.tenant_id,
@@ -470,6 +470,108 @@ class LanceMemoryStore:
             "quality_conflict_set_json": json.dumps(record.quality.conflict_set),
             "vector": record.vector,
         }
+
+    def _coerce_vector(self, vector_obj: Any) -> list[float]:
+        """Normalize vector payloads from DB backends into plain float lists."""
+
+        if vector_obj is None:
+            return []
+        if isinstance(vector_obj, list):
+            return [float(value) for value in vector_obj]
+        if hasattr(vector_obj, "tolist"):
+            return [float(value) for value in vector_obj.tolist()]
+        try:
+            return [float(value) for value in vector_obj]
+        except TypeError:
+            return []
+
+    def _safe_parse_json_list(self, value: Any, *, memory_id: str, field_name: str) -> list[str]:
+        """Parse list-like JSON fields safely so malformed legacy rows do not break writes."""
+
+        try:
+            payload = json.loads(value or "[]")
+        except Exception:
+            LOGGER.warning("Invalid %s for memory_id=%s; defaulting to empty list", field_name, memory_id)
+            return []
+        if isinstance(payload, list):
+            return [str(item) for item in payload]
+        LOGGER.warning("Invalid %s type for memory_id=%s; defaulting to empty list", field_name, memory_id)
+        return []
+
+    def _safe_parse_json_object(self, value: Any, *, memory_id: str, field_name: str) -> dict[str, Any]:
+        """Parse object-like JSON fields safely so malformed legacy rows do not break writes."""
+
+        try:
+            payload = json.loads(value or "{}")
+        except Exception:
+            LOGGER.warning("Invalid %s for memory_id=%s; defaulting to empty object", field_name, memory_id)
+            return {}
+        if isinstance(payload, dict):
+            return dict(payload)
+        LOGGER.warning("Invalid %s type for memory_id=%s; defaulting to empty object", field_name, memory_id)
+        return {}
+
+    def _parse_iso_timestamp(self, value: str | None) -> datetime | None:
+        """Parse ISO timestamps for merge precedence decisions."""
+
+        if not value:
+            return None
+        normalized = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+
+    def _latest_non_null_timestamp(self, left: str | None, right: str | None) -> str | None:
+        """Return the later timestamp when both are parseable, else favor incoming non-null values."""
+
+        if left is None:
+            return right
+        if right is None:
+            return left
+
+        left_dt = self._parse_iso_timestamp(left)
+        right_dt = self._parse_iso_timestamp(right)
+        if left_dt is not None and right_dt is not None:
+            return left if left_dt >= right_dt else right
+        # When parsing fails, prefer the incoming value to keep last-write-wins behavior.
+        return right
+
+    def _scoped_row_filter(self, *, tenant_id: str, user_id: str, agent_id: str, memory_id: str) -> str:
+        """Build a safe scoped row filter expression for LanceDB delete/replace paths."""
+
+        safe_memory_id = memory_id.replace("'", "''")
+        safe_tenant_id = tenant_id.replace("'", "''")
+        safe_user_id = user_id.replace("'", "''")
+        safe_agent_id = agent_id.replace("'", "''")
+        return " and ".join(
+            [
+                f"memory_id = '{safe_memory_id}'",
+                f"tenant_id = '{safe_tenant_id}'",
+                f"user_id = '{safe_user_id}'",
+                f"agent_id = '{safe_agent_id}'",
+            ]
+        )
+
+    def _cosine_similarity(self, left: list[float], right: list[float]) -> float | None:
+        """Compute cosine similarity for same-length vectors, or return None when invalid."""
+
+        if len(left) == 0 or len(left) != len(right):
+            return None
+
+        left_norm = math.sqrt(sum(value * value for value in left))
+        right_norm = math.sqrt(sum(value * value for value in right))
+        if left_norm == 0.0 or right_norm == 0.0:
+            return None
+
+        dot = sum(a * b for a, b in zip(left, right, strict=False))
+        return dot / (left_norm * right_norm)
+
+    def store_memory(self, record: MemoryRecord) -> MemoryRecord:
+        """Persist one memory record and return the persisted object."""
+
+        self.ensure_initialized()
+        row = self._record_to_row(record)
         if self._in_memory_mode:
             self._rows.append(row)
             return record
@@ -477,6 +579,203 @@ class LanceMemoryStore:
         assert self._table is not None
         self._table.add([row])
         return record
+
+    def find_exact_duplicate(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        content_hash: str,
+        dedupe_key: str | None,
+    ) -> dict[str, Any] | None:
+        """Find scoped exact duplicates by dedupe key or content hash."""
+
+        # Exact dedupe is correctness-critical: scan full scope to avoid false negatives.
+        rows = self.scoped_memories(tenant_id=tenant_id, user_id=user_id, agent_id=agent_id, limit=None)
+        for row in rows:
+            if dedupe_key and row.get("dedupe_key") == dedupe_key:
+                return row
+            if row.get("content_hash") == content_hash:
+                return row
+        return None
+
+    def find_similarity_duplicate(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        query_vector: list[float],
+        cosine_threshold: float = SIMILARITY_DEDUPE_THRESHOLD,
+    ) -> tuple[dict[str, Any] | None, float | None]:
+        """Find the highest-scoring scoped cosine match above the dedupe threshold."""
+
+        best_row: dict[str, Any] | None = None
+        best_score = cosine_threshold
+        best_memory_id = ""
+
+        for row in self.scoped_memories(tenant_id=tenant_id, user_id=user_id, agent_id=agent_id, limit=None):
+            row_vector = self._coerce_vector(row.get("vector"))
+            cosine = self._cosine_similarity(query_vector, row_vector)
+            if cosine is None or cosine <= cosine_threshold:
+                continue
+
+            row_memory_id = str(row.get("memory_id") or "")
+            if cosine > best_score:
+                best_row = row
+                best_score = cosine
+                best_memory_id = row_memory_id
+                continue
+
+            # Tie-breaking keeps behavior deterministic across backend row-order variants.
+            if math.isclose(cosine, best_score, abs_tol=1e-9) and row_memory_id < best_memory_id:
+                best_row = row
+                best_score = cosine
+                best_memory_id = row_memory_id
+
+        return best_row, (best_score if best_row is not None else None)
+
+    def find_merge_candidate(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        agent_id: str,
+        content_hash: str,
+        dedupe_key: str | None,
+        query_vector: list[float] | None = None,
+        cosine_threshold: float = SIMILARITY_DEDUPE_THRESHOLD,
+    ) -> tuple[dict[str, Any] | None, Literal["exact", "similarity"] | None, float | None]:
+        """Find merge candidates with exact-match precedence over semantic similarity."""
+
+        exact_match = self.find_exact_duplicate(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            content_hash=content_hash,
+            dedupe_key=dedupe_key,
+        )
+        if exact_match is not None:
+            return exact_match, "exact", 1.0
+
+        if query_vector:
+            similarity_match, cosine = self.find_similarity_duplicate(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                query_vector=query_vector,
+                cosine_threshold=cosine_threshold,
+            )
+            if similarity_match is not None:
+                return similarity_match, "similarity", cosine
+
+        return None, None, None
+
+    def merge_memory(self, *, existing_row: dict[str, Any], incoming_record: MemoryRecord) -> dict[str, Any]:
+        """Merge incoming data into an existing canonical row and persist replacement."""
+
+        self.ensure_initialized()
+        existing_memory_id = str(existing_row.get("memory_id") or incoming_record.memory_id)
+        existing_tags = self._safe_parse_json_list(
+            existing_row.get("tags_json"),
+            memory_id=existing_memory_id,
+            field_name="tags_json",
+        )
+        existing_metadata = self._safe_parse_json_object(
+            existing_row.get("metadata_json"),
+            memory_id=existing_memory_id,
+            field_name="metadata_json",
+        )
+
+        # Merge policy is explicit so dedupe behavior remains deterministic over time.
+        merged_tags: list[str] = []
+        seen_tags: set[str] = set()
+        for tag in existing_tags + [str(tag) for tag in incoming_record.tags]:
+            if tag in seen_tags:
+                continue
+            seen_tags.add(tag)
+            merged_tags.append(tag)
+
+        merged_metadata = dict(existing_metadata)
+        merged_metadata.update(incoming_record.metadata)
+
+        try:
+            existing_importance = float(existing_row.get("importance") or 0.0)
+        except (TypeError, ValueError):
+            existing_importance = 0.0
+
+        existing_schema_version = incoming_record.schema_version
+        try:
+            existing_schema_version = int(existing_row.get("schema_version"))
+        except (TypeError, ValueError):
+            existing_schema_version = incoming_record.schema_version
+
+        merged_row = dict(existing_row)
+        merged_row.update(
+            {
+                "memory_id": existing_memory_id,
+                "schema_version": existing_schema_version,
+                "tenant_id": str(existing_row.get("tenant_id") or incoming_record.tenant_id),
+                "user_id": str(existing_row.get("user_id") or incoming_record.user_id),
+                "agent_id": str(existing_row.get("agent_id") or incoming_record.agent_id),
+                "text": incoming_record.text,
+                "category": incoming_record.category,
+                "tags_json": json.dumps(merged_tags),
+                "importance": max(existing_importance, float(incoming_record.importance)),
+                "scope": incoming_record.scope.value,
+                "sensitivity": incoming_record.sensitivity.value,
+                "source_channel": incoming_record.source_channel,
+                "source_session": incoming_record.source_session,
+                "source_actor": incoming_record.source_actor,
+                "created_at": str(existing_row.get("created_at") or incoming_record.created_at),
+                "updated_at": incoming_record.updated_at,
+                "ttl_expires_at": self._latest_non_null_timestamp(
+                    existing_row.get("ttl_expires_at"),
+                    incoming_record.ttl_expires_at,
+                ),
+                "embedding_model_id": incoming_record.embedding_model_id,
+                "content_hash": incoming_record.content_hash,
+                "dedupe_key": incoming_record.dedupe_key or existing_row.get("dedupe_key"),
+                "metadata_json": json.dumps(merged_metadata),
+                "provenance_source_type": incoming_record.provenance.source_type,
+                "provenance_source_ref": incoming_record.provenance.source_ref,
+                "quality_confidence": incoming_record.quality.confidence,
+                "quality_verification_status": incoming_record.quality.verification_status,
+                "quality_conflict_set_json": json.dumps(incoming_record.quality.conflict_set),
+                "vector": incoming_record.vector,
+            }
+        )
+
+        tenant_id = str(merged_row.get("tenant_id") or incoming_record.tenant_id)
+        user_id = str(merged_row.get("user_id") or incoming_record.user_id)
+        agent_id = str(merged_row.get("agent_id") or incoming_record.agent_id)
+
+        if self._in_memory_mode:
+            for index, row in enumerate(self._rows):
+                if (
+                    str(row.get("memory_id")) == existing_memory_id
+                    and row.get("tenant_id") == tenant_id
+                    and row.get("user_id") == user_id
+                    and row.get("agent_id") == agent_id
+                ):
+                    self._rows[index] = merged_row
+                    return merged_row
+            # If row lookup fails in-memory, append replacement to avoid data loss.
+            self._rows.append(merged_row)
+            return merged_row
+
+        assert self._table is not None
+        self._table.delete(
+            self._scoped_row_filter(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                memory_id=existing_memory_id,
+            )
+        )
+        self._table.add([merged_row])
+        return merged_row
 
     def find_duplicate(
         self,
@@ -487,22 +786,15 @@ class LanceMemoryStore:
         content_hash: str,
         dedupe_key: str | None,
     ) -> dict[str, Any] | None:
-        """Find an existing row that matches dedupe constraints."""
+        """Backward-compatible exact dedupe helper retained for compatibility tests."""
 
-        # Dedupe is correctness-critical: scan full scoped data to avoid false negatives.
-        rows = self.list_all_memories()
-        for row in rows:
-            if row.get("tenant_id") != tenant_id:
-                continue
-            if row.get("user_id") != user_id:
-                continue
-            if row.get("agent_id") != agent_id:
-                continue
-            if dedupe_key and row.get("dedupe_key") == dedupe_key:
-                return row
-            if row.get("content_hash") == content_hash:
-                return row
-        return None
+        return self.find_exact_duplicate(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            content_hash=content_hash,
+            dedupe_key=dedupe_key,
+        )
 
     def list_memories(self, limit: int = 5000) -> list[dict[str, Any]]:
         """Return raw rows for retrieval and maintenance workflows."""
@@ -649,19 +941,12 @@ class LanceMemoryStore:
             return True
 
         assert self._table is not None
-        # Escape single quotes to keep filter expression safe for the current SQL-like API.
-        safe_memory_id = memory_id.replace("'", "''")
-        safe_tenant_id = tenant_id.replace("'", "''")
-        safe_user_id = user_id.replace("'", "''")
-        safe_agent_id = agent_id.replace("'", "''")
         self._table.delete(
-            " and ".join(
-                [
-                    f"memory_id = '{safe_memory_id}'",
-                    f"tenant_id = '{safe_tenant_id}'",
-                    f"user_id = '{safe_user_id}'",
-                    f"agent_id = '{safe_agent_id}'",
-                ]
+            self._scoped_row_filter(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                memory_id=memory_id,
             )
         )
         return True
